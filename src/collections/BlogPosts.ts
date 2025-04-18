@@ -1,4 +1,10 @@
 import type { CollectionConfig } from 'payload'
+import {
+  lexicalEditor,
+  FixedToolbarFeature,
+  LinkFeature,
+  UploadFeature,
+} from '@payloadcms/richtext-lexical'
 
 const BlogPosts: CollectionConfig = {
   slug: 'blog-posts',
@@ -15,16 +21,52 @@ const BlogPosts: CollectionConfig = {
       type: 'text',
       required: true,
     },
+
     {
       name: 'slug',
       type: 'text',
       required: true,
       unique: true,
+      admin: {
+        components: {
+          Field: '@/components/fields/TestField.tsx',
+        },
+      },
     },
     {
       name: 'content',
       type: 'richText',
       required: true,
+      editor: lexicalEditor({
+        features: ({ defaultFeatures }) => [
+          FixedToolbarFeature(), // 👈 add this first for best layout
+          ...defaultFeatures,
+          LinkFeature({
+            fields: ({ defaultFields }) => [
+              ...defaultFields,
+              {
+                name: 'rel',
+                label: 'Rel Attribute',
+                type: 'select',
+                hasMany: true,
+                options: ['noopener', 'noreferrer', 'nofollow'],
+              },
+            ],
+          }),
+          UploadFeature({
+            collections: {
+              uploads: {
+                fields: [
+                  {
+                    name: 'caption',
+                    type: 'text',
+                  },
+                ],
+              },
+            },
+          }),
+        ],
+      }),
     },
     {
       name: 'excerpt',
@@ -49,6 +91,7 @@ const BlogPosts: CollectionConfig = {
       type: 'relationship',
       relationTo: 'users', // Connected to your Users collection
       required: true,
+      defaultValue: ({ user }) => user?.id,
     },
 
     {
