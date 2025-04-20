@@ -13,8 +13,12 @@ const BlogPosts: CollectionConfig = {
     defaultColumns: ['title', 'author', 'publishedDate'],
   },
   access: {
-    read: () => true,
+    read: () => true, // public read
+    create: ({ req }) => Boolean(req.user),
+    update: ({ req }) => Boolean(req.user),
+    delete: ({ req }) => Boolean(req.user),
   },
+
   fields: [
     {
       name: 'title',
