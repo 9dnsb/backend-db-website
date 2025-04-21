@@ -70,6 +70,7 @@ export interface Config {
     users: User;
     media: Media;
     'blog-posts': BlogPost;
+    puzzles: Puzzle;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
     'payload-migrations': PayloadMigration;
@@ -79,6 +80,7 @@ export interface Config {
     users: UsersSelect<false> | UsersSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
     'blog-posts': BlogPostsSelect<false> | BlogPostsSelect<true>;
+    puzzles: PuzzlesSelect<false> | PuzzlesSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
     'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
@@ -192,6 +194,45 @@ export interface BlogPost {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "puzzles".
+ */
+export interface Puzzle {
+  id: string;
+  publishedDate: string;
+  slug: string;
+  easyGroup: {
+    label: string;
+    words: {
+      word: string;
+      id?: string | null;
+    }[];
+  };
+  mediumGroup: {
+    label: string;
+    words: {
+      word: string;
+      id?: string | null;
+    }[];
+  };
+  hardGroup: {
+    label: string;
+    words: {
+      word: string;
+      id?: string | null;
+    }[];
+  };
+  trickyGroup: {
+    label: string;
+    words: {
+      word: string;
+      id?: string | null;
+    }[];
+  };
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-locked-documents".
  */
 export interface PayloadLockedDocument {
@@ -208,6 +249,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'blog-posts';
         value: string | BlogPost;
+      } | null)
+    | ({
+        relationTo: 'puzzles';
+        value: string | Puzzle;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -300,6 +345,60 @@ export interface BlogPostsSelect<T extends boolean = true> {
     | {
         tag?: T;
         id?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "puzzles_select".
+ */
+export interface PuzzlesSelect<T extends boolean = true> {
+  publishedDate?: T;
+  slug?: T;
+  easyGroup?:
+    | T
+    | {
+        label?: T;
+        words?:
+          | T
+          | {
+              word?: T;
+              id?: T;
+            };
+      };
+  mediumGroup?:
+    | T
+    | {
+        label?: T;
+        words?:
+          | T
+          | {
+              word?: T;
+              id?: T;
+            };
+      };
+  hardGroup?:
+    | T
+    | {
+        label?: T;
+        words?:
+          | T
+          | {
+              word?: T;
+              id?: T;
+            };
+      };
+  trickyGroup?:
+    | T
+    | {
+        label?: T;
+        words?:
+          | T
+          | {
+              word?: T;
+              id?: T;
+            };
       };
   updatedAt?: T;
   createdAt?: T;

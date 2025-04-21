@@ -11,6 +11,7 @@ import { Users } from './collections/Users'
 import { Media } from './collections/Media'
 import BlogPosts from './collections/BlogPosts'
 import AboutMe from './app/(payload)/globals/aboutMe'
+import Puzzles from './collections/puzzles'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -22,7 +23,7 @@ export default buildConfig({
       baseDir: path.resolve(dirname),
     },
   },
-  collections: [Users, Media, BlogPosts],
+  collections: [Users, Media, BlogPosts, Puzzles],
   globals: [AboutMe],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
