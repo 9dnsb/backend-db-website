@@ -25,8 +25,8 @@ const difficultyGroupFields: Field[] = [
   },
 ]
 
-const Puzzles: CollectionConfig = {
-  slug: 'puzzles',
+const MixAndMatchPuzzles: CollectionConfig = {
+  slug: 'mixandmatchpuzzles',
   admin: {
     useAsTitle: 'slug',
   },
@@ -89,4 +89,4 @@ const Puzzles: CollectionConfig = {
   ],
 }
 
-export default Puzzles
+export default MixAndMatchPuzzles

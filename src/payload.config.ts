@@ -12,6 +12,10 @@ import { Media } from './collections/Media'
 import BlogPosts from './collections/BlogPosts'
 import AboutMe from './app/(payload)/globals/aboutMe'
 import Puzzles from './collections/puzzles'
+import MixAndMatchPuzzles from './collections/mixandmatchpuzzles'
+import OneOffPuzzles from './collections/oneoffpuzzles'
+
+import { generateOneoffsHandler } from './utils/generateOneoffsHandler'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -23,7 +27,7 @@ export default buildConfig({
       baseDir: path.resolve(dirname),
     },
   },
-  collections: [Users, Media, BlogPosts, Puzzles],
+  collections: [Users, Media, BlogPosts, Puzzles, MixAndMatchPuzzles, OneOffPuzzles],
   globals: [AboutMe],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
@@ -37,5 +41,12 @@ export default buildConfig({
   plugins: [
     payloadCloudPlugin(),
     // storage-adapter-placeholder
+  ],
+  endpoints: [
+    {
+      path: '/generate-oneoffs',
+      method: 'post',
+      handler: generateOneoffsHandler,
+    },
   ],
 })

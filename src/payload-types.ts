@@ -71,6 +71,8 @@ export interface Config {
     media: Media;
     'blog-posts': BlogPost;
     puzzles: Puzzle;
+    mixandmatchpuzzles: Mixandmatchpuzzle;
+    oneoffpuzzles: Oneoffpuzzle;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
     'payload-migrations': PayloadMigration;
@@ -81,6 +83,8 @@ export interface Config {
     media: MediaSelect<false> | MediaSelect<true>;
     'blog-posts': BlogPostsSelect<false> | BlogPostsSelect<true>;
     puzzles: PuzzlesSelect<false> | PuzzlesSelect<true>;
+    mixandmatchpuzzles: MixandmatchpuzzlesSelect<false> | MixandmatchpuzzlesSelect<true>;
+    oneoffpuzzles: OneoffpuzzlesSelect<false> | OneoffpuzzlesSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
     'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
@@ -233,6 +237,61 @@ export interface Puzzle {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "mixandmatchpuzzles".
+ */
+export interface Mixandmatchpuzzle {
+  id: string;
+  publishedDate: string;
+  slug: string;
+  easyGroup: {
+    label: string;
+    words: {
+      word: string;
+      id?: string | null;
+    }[];
+  };
+  mediumGroup: {
+    label: string;
+    words: {
+      word: string;
+      id?: string | null;
+    }[];
+  };
+  hardGroup: {
+    label: string;
+    words: {
+      word: string;
+      id?: string | null;
+    }[];
+  };
+  trickyGroup: {
+    label: string;
+    words: {
+      word: string;
+      id?: string | null;
+    }[];
+  };
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "oneoffpuzzles".
+ */
+export interface Oneoffpuzzle {
+  id: string;
+  publishedDate: string;
+  slug: string;
+  startingWord: string;
+  validAnswers: {
+    word: string;
+    id?: string | null;
+  }[];
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-locked-documents".
  */
 export interface PayloadLockedDocument {
@@ -253,6 +312,14 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'puzzles';
         value: string | Puzzle;
+      } | null)
+    | ({
+        relationTo: 'mixandmatchpuzzles';
+        value: string | Mixandmatchpuzzle;
+      } | null)
+    | ({
+        relationTo: 'oneoffpuzzles';
+        value: string | Oneoffpuzzle;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -399,6 +466,77 @@ export interface PuzzlesSelect<T extends boolean = true> {
               word?: T;
               id?: T;
             };
+      };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "mixandmatchpuzzles_select".
+ */
+export interface MixandmatchpuzzlesSelect<T extends boolean = true> {
+  publishedDate?: T;
+  slug?: T;
+  easyGroup?:
+    | T
+    | {
+        label?: T;
+        words?:
+          | T
+          | {
+              word?: T;
+              id?: T;
+            };
+      };
+  mediumGroup?:
+    | T
+    | {
+        label?: T;
+        words?:
+          | T
+          | {
+              word?: T;
+              id?: T;
+            };
+      };
+  hardGroup?:
+    | T
+    | {
+        label?: T;
+        words?:
+          | T
+          | {
+              word?: T;
+              id?: T;
+            };
+      };
+  trickyGroup?:
+    | T
+    | {
+        label?: T;
+        words?:
+          | T
+          | {
+              word?: T;
+              id?: T;
+            };
+      };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "oneoffpuzzles_select".
+ */
+export interface OneoffpuzzlesSelect<T extends boolean = true> {
+  publishedDate?: T;
+  slug?: T;
+  startingWord?: T;
+  validAnswers?:
+    | T
+    | {
+        word?: T;
+        id?: T;
       };
   updatedAt?: T;
   createdAt?: T;
