@@ -1,10 +1,17 @@
 import payload from 'payload'
+import config from '@/payload.config' // ✅ Correct real import
 import { generateOneOffCandidates } from '@/utils/generateOneOffCandidates'
 import englishWords from 'an-array-of-english-words'
 
 const MW_API_KEY = process.env.MW_API_KEY as string
 
 export async function GET() {
+  if (!payload.config) {
+    await payload.init({
+      config, // ✅ Pass real imported config
+    })
+  }
+
   const startingWord = englishWords[Math.floor(Math.random() * englishWords.length)]
   const candidates = generateOneOffCandidates(startingWord)
 
