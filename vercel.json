@@ -3,10 +3,6 @@
     {
       "path": "/api/queue-oneoff-puzzle",
       "schedule": "0 5 * * *"
-    },
-    {
-      "path": "/api/payload-jobs/run",
-      "schedule": "5 5 * * *"
     }
   ]
 }
