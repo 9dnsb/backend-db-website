@@ -15,6 +15,23 @@ export async function GET() {
     await payload.init({ config })
   }
 
+  const slug = new Date().toISOString().slice(0, 10)
+
+  // ❗ Prevent duplicate puzzle creation for the same date
+  const existing = await payload.find({
+    collection: 'oneoffpuzzles',
+    where: {
+      slug: {
+        equals: slug,
+      },
+    },
+  })
+
+  if (existing.totalDocs > 0) {
+    console.warn(`⚠️ Puzzle for slug '${slug}' already exists.`)
+    return new Response('Puzzle already exists', { status: 200 })
+  }
+
   const englishWordSet = new Set(englishWords)
 
   let startingWord = ''
@@ -64,7 +81,7 @@ export async function GET() {
   await payload.create({
     collection: 'oneoffpuzzles',
     data: {
-      slug: publishDate.slice(0, 10),
+      slug,
       startingWord,
       validAnswers: valid.map((word) => ({ word })),
       publishedDate: publishDate,
