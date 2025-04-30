@@ -4,6 +4,10 @@ import englishWords from 'an-array-of-english-words'
 
 const MW_API_KEY = process.env.MW_API_KEY as string
 
+if (!MW_API_KEY) {
+  throw new Error('❌ Missing Merriam-Webster API key (MW_API_KEY)')
+}
+
 const createOneOffPuzzle = async ({ payload }: { payload: Payload }) => {
   try {
     console.log('🎲 Starting to pick a valid starting word...')
@@ -15,7 +19,11 @@ const createOneOffPuzzle = async ({ payload }: { payload: Payload }) => {
 
     // Keep trying until we find a word with 6-20 valid one-offs
     while (true) {
-      startingWord = englishWords[Math.floor(Math.random() * englishWords.length)]
+      const rawWord = englishWords[Math.floor(Math.random() * englishWords.length)]
+      startingWord = rawWord.toLowerCase().replace(/[^a-z]/g, '')
+
+      if (startingWord.length < 3) continue
+
       console.log(`🎲 Trying starting word: ${startingWord}`)
 
       const candidates = generateOneOffCandidates(startingWord)
@@ -27,7 +35,13 @@ const createOneOffPuzzle = async ({ payload }: { payload: Payload }) => {
         const url = `https://www.dictionaryapi.com/api/v3/references/collegiate/json/${word}?key=${MW_API_KEY}`
         const res = await fetch(url)
         const data = await res.json()
-        if (Array.isArray(data) && typeof data[0] === 'object') {
+        if (
+          Array.isArray(data) &&
+          typeof data[0] === 'object' &&
+          'shortdef' in data[0] &&
+          Array.isArray(data[0].shortdef) &&
+          data[0].shortdef.length > 0
+        ) {
           checkValid.push(word)
         }
       }
@@ -43,6 +57,11 @@ const createOneOffPuzzle = async ({ payload }: { payload: Payload }) => {
           `⚠️ Word '${startingWord}' had ${checkValid.length} valid one-offs — trying another...`,
         )
       }
+    }
+
+    // Final sanity check
+    if (valid.length < 6 || valid.length > 20) {
+      throw new Error(`❌ Invalid validAnswers count: ${valid.length}. Aborting.`)
     }
 
     const publishDate = new Date().toISOString()
