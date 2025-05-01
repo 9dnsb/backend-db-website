@@ -1,3 +1,4 @@
+import { adminOnlyAccess } from '@/access/adminOnlyAccess'
 import type { CollectionConfig } from 'payload'
 
 const OneOffPuzzles: CollectionConfig = {
@@ -5,9 +6,7 @@ const OneOffPuzzles: CollectionConfig = {
   admin: {
     useAsTitle: 'slug',
   },
-  access: {
-    read: () => true,
-  },
+  access: adminOnlyAccess,
   hooks: {
     beforeValidate: [
       ({ data }) => {

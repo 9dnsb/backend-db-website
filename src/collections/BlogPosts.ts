@@ -6,6 +6,9 @@ import {
   UploadFeature,
 } from '@payloadcms/richtext-lexical'
 
+import { isAdminUIOnly } from '../access/isAdminUIOnly'
+import { verifyOwnershipOrAdmin } from '@/access/verifyOwnershipOrAdmin'
+
 const BlogPosts: CollectionConfig = {
   slug: 'blog-posts',
   admin: {
@@ -13,10 +16,11 @@ const BlogPosts: CollectionConfig = {
     defaultColumns: ['title', 'author', 'publishedDate'],
   },
   access: {
-    read: () => true, // public read
-    create: ({ req }) => Boolean(req.user),
-    update: ({ req }) => Boolean(req.user),
-    delete: ({ req }) => Boolean(req.user),
+    read: () => true,
+    create: ({ req }) => !!req.user,
+    update: verifyOwnershipOrAdmin,
+    delete: verifyOwnershipOrAdmin,
+    admin: isAdminUIOnly,
   },
 
   fields: [
@@ -24,6 +28,16 @@ const BlogPosts: CollectionConfig = {
       name: 'title',
       type: 'text',
       required: true,
+    },
+    {
+      name: 'author',
+      type: 'relationship',
+      relationTo: 'users',
+      required: true,
+      defaultValue: ({ user }) => user?.id,
+      admin: {
+        condition: () => false,
+      },
     },
 
     {
@@ -91,14 +105,6 @@ const BlogPosts: CollectionConfig = {
     },
 
     {
-      name: 'author',
-      type: 'relationship',
-      relationTo: 'users', // Connected to your Users collection
-      required: true,
-      defaultValue: ({ user }) => user?.id,
-    },
-
-    {
       name: 'tags',
       type: 'array',
       fields: [
@@ -110,6 +116,16 @@ const BlogPosts: CollectionConfig = {
     },
   ],
   timestamps: true,
+  hooks: {
+    beforeChange: [
+      ({ data, req, operation }) => {
+        if (operation === 'create' && req.user) {
+          data.author = req.user.id
+        }
+        return data
+      },
+    ],
+  },
 }
 
 export default BlogPosts

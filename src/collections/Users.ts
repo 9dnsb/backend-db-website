@@ -1,3 +1,6 @@
+import { isAdmin } from '@/access/isAdmin'
+import { isAdminUIOnly } from '@/access/isAdminUIOnly'
+import { isSelfOrAdmin } from '@/access/isSelfOrAdmin'
 import { logSuccessfulLogin } from '@/hooks/logSuccessfulLogin'
 import type { CollectionConfig } from 'payload'
 
@@ -14,17 +17,40 @@ export const Users: CollectionConfig = {
       secure: true,
     },
   },
+
   fields: [
-    // Email added by default
-    // Add more fields as needed
+    {
+      name: 'role',
+      type: 'select',
+      options: [
+        { label: 'Admin', value: 'admin' },
+        { label: 'User', value: 'user' },
+      ],
+      defaultValue: 'user',
+      required: true,
+      access: {
+        create: ({ req }) => req.user?.role === 'admin',
+        update: ({ req }) => req.user?.role === 'admin',
+      },
+    },
   ],
   access: {
-    read: () => true,
-    create: ({ req }) => !!req.user,
-    update: ({ req }) => !!req.user,
-    delete: ({ req }) => !!req.user,
+    read: isSelfOrAdmin,
+    create: () => true,
+    update: isSelfOrAdmin,
+    delete: isAdmin,
+    admin: isAdminUIOnly,
   },
+
   hooks: {
+    beforeChange: [
+      ({ data, req, operation }) => {
+        if (operation === 'create' && !req.user) {
+          data.role = 'user' // force new users to be "user" if unauthenticated
+        }
+        return data
+      },
+    ],
     afterLogin: [logSuccessfulLogin], // ✅ Goes here
   },
 }

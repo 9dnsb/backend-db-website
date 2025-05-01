@@ -1,3 +1,5 @@
+import { adminOnlyAccess } from '@/access/adminOnlyAccess'
+
 import type { CollectionConfig, Field } from 'payload'
 
 const defaultGroup = Array.from({ length: 4 }, () => ({ word: '' }))
@@ -30,9 +32,7 @@ const Puzzles: CollectionConfig = {
   admin: {
     useAsTitle: 'slug',
   },
-  access: {
-    read: () => true,
-  },
+  access: adminOnlyAccess,
   hooks: {
     beforeValidate: [
       ({ data }) => {

@@ -1,3 +1,4 @@
+// src/utils/generateOneoffsHandler.ts
 import type { PayloadHandler } from 'payload'
 import { generateOneOffCandidates } from '../utils/generateOneOffCandidates'
 import englishWords from 'an-array-of-english-words'
@@ -5,6 +6,11 @@ import englishWords from 'an-array-of-english-words'
 const MW_API_KEY = process.env.MW_API_KEY as string
 
 export const generateOneoffsHandler: PayloadHandler = async (req) => {
+  // Ensure user is authenticated
+  if (!req.user) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+  }
+
   try {
     if (typeof req.json !== 'function') {
       return new Response(JSON.stringify({ error: 'Invalid request context' }), { status: 500 })
@@ -23,8 +29,13 @@ export const generateOneoffsHandler: PayloadHandler = async (req) => {
         status: 400,
       })
     }
+
+    // Sanitize the starting word to remove unwanted characters
+    const sanitizedStartingWord = startingWord.replace(/[^a-zA-Z0-9]/g, '')
+
+    // Logic for filtering words
     const englishWordSet = new Set(englishWords)
-    const candidates = generateOneOffCandidates(startingWord)
+    const candidates = generateOneOffCandidates(sanitizedStartingWord)
     const filtered = candidates.filter((word) => englishWordSet.has(word))
 
     const valid: string[] = []

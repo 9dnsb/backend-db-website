@@ -139,6 +139,7 @@ export interface UserAuthOperations {
  */
 export interface User {
   id: string;
+  role: 'admin' | 'user';
   updatedAt: string;
   createdAt: string;
   email: string;
@@ -176,6 +177,7 @@ export interface Media {
 export interface BlogPost {
   id: string;
   title: string;
+  author?: (string | null) | User;
   slug: string;
   content: {
     root: {
@@ -194,7 +196,6 @@ export interface BlogPost {
   };
   excerpt?: string | null;
   publishedDate: string;
-  author: string | User;
   tags?:
     | {
         tag?: string | null;
@@ -472,6 +473,7 @@ export interface PayloadMigration {
  * via the `definition` "users_select".
  */
 export interface UsersSelect<T extends boolean = true> {
+  role?: T;
   updatedAt?: T;
   createdAt?: T;
   email?: T;
@@ -506,11 +508,11 @@ export interface MediaSelect<T extends boolean = true> {
  */
 export interface BlogPostsSelect<T extends boolean = true> {
   title?: T;
+  author?: T;
   slug?: T;
   content?: T;
   excerpt?: T;
   publishedDate?: T;
-  author?: T;
   tags?:
     | T
     | {

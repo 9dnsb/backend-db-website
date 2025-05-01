@@ -1,12 +1,15 @@
 import type { CollectionConfig } from 'payload'
+import { isAdmin } from '../access/isAdmin'
+import { isAdminUIOnly } from '../access/isAdminUIOnly'
 
 export const Media: CollectionConfig = {
   slug: 'media',
   access: {
     read: () => true,
     create: ({ req }) => !!req.user,
-    update: ({ req }) => !!req.user,
-    delete: ({ req }) => !!req.user,
+    update: isAdmin,
+    delete: isAdmin,
+    admin: isAdminUIOnly,
   },
   fields: [
     {
@@ -15,5 +18,7 @@ export const Media: CollectionConfig = {
       required: true,
     },
   ],
-  upload: true,
+  upload: {
+    mimeTypes: ['image/png', 'image/jpeg', 'image/webp'],
+  },
 }
