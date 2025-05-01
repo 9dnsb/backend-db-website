@@ -1,62 +1,93 @@
-// src/utils/generateOneoffsHandler.ts
-import { PayloadHandler } from 'payload'
-import englishWords from 'an-array-of-english-words'
+import payload from 'payload'
+import config from '@/payload.config'
 import { generateOneOffCandidates } from '@/utils/generateOneOffCandidates'
+import englishWords from 'an-array-of-english-words'
 
 const MW_API_KEY = process.env.MW_API_KEY as string
 
-export const generateOneoffsHandler: PayloadHandler = async (req) => {
-  // Ensure the user is authenticated
-  if (!req.user) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 }) // Unauthorized if user is not authenticated
+export async function GET() {
+  if (!MW_API_KEY) {
+    console.error('❌ Missing Merriam-Webster API key (MW_API_KEY)')
+    return new Response('Missing MW_API_KEY', { status: 500 })
   }
 
-  try {
-    if (typeof req.json !== 'function') {
-      return new Response(JSON.stringify({ error: 'Invalid request context' }), { status: 500 })
-    }
+  if (!payload.config) {
+    await payload.init({ config })
+  }
 
-    const contentType = req.headers.get('content-type') || ''
-    if (!contentType.includes('application/json')) {
-      return new Response(JSON.stringify({ error: 'Expected JSON' }), { status: 415 })
-    }
+  const slug = new Date().toISOString().slice(0, 10)
 
-    const body = await req.json()
-    const { startingWord } = body
+  // ❗ Prevent duplicate puzzle creation for the same date
+  const existing = await payload.find({
+    collection: 'oneoffpuzzles',
+    where: {
+      slug: {
+        equals: slug,
+      },
+    },
+  })
 
-    if (!startingWord || typeof startingWord !== 'string') {
-      return new Response(JSON.stringify({ error: 'Missing or invalid startingWord' }), {
-        status: 400,
-      })
-    }
+  if (existing.totalDocs > 0) {
+    console.warn(`⚠️ Puzzle for slug '${slug}' already exists.`)
+    return new Response('Puzzle already exists', { status: 200 })
+  }
 
-    // Sanitize the starting word to remove unwanted characters
-    const sanitizedStartingWord = startingWord.replace(/[^a-zA-Z0-9]/g, '')
+  const englishWordSet = new Set(englishWords)
 
-    // Logic for filtering words
-    const englishWordSet = new Set(englishWords)
-    const candidates = generateOneOffCandidates(sanitizedStartingWord)
-    const filtered = candidates.filter((word) => englishWordSet.has(word))
+  let startingWord = ''
+  let valid: string[] = []
 
-    const valid: string[] = []
+  // Try until we find a good puzzle
+  while (true) {
+    const rawWord = englishWords[Math.floor(Math.random() * englishWords.length)]
+    startingWord = rawWord.toLowerCase().replace(/[^a-z]/g, '')
+
+    if (startingWord.length < 3) continue
+
+    const candidates = generateOneOffCandidates(startingWord)
+    const filtered = candidates.filter((w) => englishWordSet.has(w))
+
+    const checkValid: string[] = []
 
     for (const word of filtered) {
       const url = `https://www.dictionaryapi.com/api/v3/references/collegiate/json/${word}?key=${MW_API_KEY}`
-
       const res = await fetch(url)
       const data = await res.json()
-
-      if (Array.isArray(data) && typeof data[0] === 'object') {
-        valid.push(word)
+      if (
+        Array.isArray(data) &&
+        typeof data[0] === 'object' &&
+        'shortdef' in data[0] &&
+        Array.isArray(data[0].shortdef) &&
+        data[0].shortdef.length > 0
+      ) {
+        checkValid.push(word)
       }
     }
 
-    return new Response(JSON.stringify({ words: valid }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    })
-  } catch (err) {
-    console.error('❌ Merriam-Webster filter failed:', err)
-    return new Response(JSON.stringify({ error: 'Internal Server Error' }), { status: 500 })
+    if (checkValid.length >= 6 && checkValid.length <= 20) {
+      valid = checkValid
+      break
+    }
   }
+
+  // Final sanity check
+  if (valid.length < 6 || valid.length > 20) {
+    console.error(`❌ Refusing to create puzzle with ${valid.length} answers`)
+    return new Response('Invalid puzzle. Not created.', { status: 400 })
+  }
+
+  const publishDate = new Date().toISOString()
+
+  await payload.create({
+    collection: 'oneoffpuzzles',
+    data: {
+      slug,
+      startingWord,
+      validAnswers: valid.map((word) => ({ word })),
+      publishedDate: publishDate,
+    },
+  })
+
+  console.log(`✅ Created OneOff Puzzle for '${startingWord}' with ${valid.length} answers`)
+  return new Response('✅ Created OneOff Puzzle', { status: 200 })
 }
