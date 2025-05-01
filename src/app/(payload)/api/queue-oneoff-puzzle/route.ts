@@ -8,7 +8,7 @@ const MW_API_KEY = process.env.MW_API_KEY as string
 export async function GET() {
   if (!MW_API_KEY) {
     console.error('❌ Missing Merriam-Webster API key (MW_API_KEY)')
-    return new Response('Missing MW_API_KEY', { status: 500 })
+    return new Response('Missing MW_API_KEYs', { status: 500 })
   }
 
   if (!payload.config) {
