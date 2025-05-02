@@ -2,10 +2,7 @@
   "crons": [
     {
       "path": "/api/queue-oneoff-puzzle",
-      "schedule": "0 5 * * *",
-      "headers": {
-        "x-cron-secret": "nA92fjO12ifdjOQp2hf92hHfa2f3h21"
-      }
+      "schedule": "0 5 * * *"
     }
   ]
 }

@@ -6,7 +6,6 @@ import { generateOneOffCandidates } from '@/utils/generateOneOffCandidates'
 import englishWords from 'an-array-of-english-words'
 
 const MW_API_KEY = process.env.MW_API_KEY as string
-const CRON_SECRET = process.env.CRON_SECRET as string
 const MAX_ATTEMPTS = 25
 
 // Top-level memoization
@@ -25,19 +24,19 @@ async function fetchWithTimeout<T = unknown>(url: string, ms = 5000): Promise<T>
 }
 
 export async function GET(req: Request) {
-  // ✅ Method safety (extra hardening)
-  if (req.method !== 'GET') {
-    return new Response(JSON.stringify({ error: 'Method Not Allowed' }), {
-      status: 405,
+  const url = new URL(req.url)
+  const secret = url.searchParams.get('secret')
+
+  if (secret !== process.env.CRON_SECRET) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
       headers: { 'Cache-Control': 'no-store', 'Content-Type': 'application/json' },
     })
   }
 
-  // ✅ A01 – Access control
-  const secret = req.headers.get('x-cron-secret')
-  if (secret !== CRON_SECRET) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401,
+  if (req.method !== 'GET') {
+    return new Response(JSON.stringify({ error: 'Method Not Allowed' }), {
+      status: 405,
       headers: { 'Cache-Control': 'no-store', 'Content-Type': 'application/json' },
     })
   }
