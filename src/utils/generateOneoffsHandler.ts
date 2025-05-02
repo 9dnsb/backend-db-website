@@ -1,12 +1,8 @@
-// src/utils/generateOneoffsHandler.ts
 import type { PayloadHandler } from 'payload'
 import { generateOneOffCandidates } from '../utils/generateOneOffCandidates'
-import englishWords from 'an-array-of-english-words'
-
-const MW_API_KEY = process.env.MW_API_KEY as string
+import { filterValidOneOffs } from '../utils/filterValidOneOffs'
 
 export const generateOneoffsHandler: PayloadHandler = async (req) => {
-  // Ensure user is authenticated
   if (!req.user) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
   }
@@ -30,26 +26,9 @@ export const generateOneoffsHandler: PayloadHandler = async (req) => {
       })
     }
 
-    // Sanitize the starting word to remove unwanted characters
-    const sanitizedStartingWord = startingWord.replace(/[^a-zA-Z0-9]/g, '')
-
-    // Logic for filtering words
-    const englishWordSet = new Set(englishWords)
-    const candidates = generateOneOffCandidates(sanitizedStartingWord)
-    const filtered = candidates.filter((word) => englishWordSet.has(word))
-
-    const valid: string[] = []
-
-    for (const word of filtered) {
-      const url = `https://www.dictionaryapi.com/api/v3/references/collegiate/json/${word}?key=${MW_API_KEY}`
-
-      const res = await fetch(url)
-      const data = await res.json()
-
-      if (Array.isArray(data) && typeof data[0] === 'object') {
-        valid.push(word)
-      }
-    }
+    const sanitized = startingWord.replace(/[^a-z]/gi, '')
+    const candidates = generateOneOffCandidates(sanitized)
+    const valid = await filterValidOneOffs(candidates)
 
     return new Response(JSON.stringify({ words: valid }), {
       status: 200,

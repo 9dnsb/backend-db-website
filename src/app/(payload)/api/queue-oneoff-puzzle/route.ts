@@ -2,22 +2,10 @@ import payload from 'payload'
 import config from '@/payload.config'
 import { generateOneOffCandidates } from '@/utils/generateOneOffCandidates'
 import englishWords from 'an-array-of-english-words'
+import { filterValidOneOffs } from '@/utils/filterValidOneOffs'
 
 const MW_API_KEY = process.env.MW_API_KEY as string
 const MAX_ATTEMPTS = 25
-
-const englishWordSet = new Set(englishWords)
-
-async function fetchWithTimeout<T = unknown>(url: string, ms = 5000): Promise<T> {
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), ms)
-  try {
-    const res = await fetch(url, { signal: controller.signal })
-    return (await res.json()) as T
-  } finally {
-    clearTimeout(timeout)
-  }
-}
 
 export async function GET(req: Request) {
   const url = new URL(req.url)
@@ -86,27 +74,7 @@ export async function GET(req: Request) {
       if (startingWord.length < 3) continue
 
       const candidates = generateOneOffCandidates(startingWord)
-      const filtered = candidates.filter((w) => englishWordSet.has(w))
-
-      const checkValid: string[] = []
-
-      for (const word of filtered) {
-        try {
-          const url = `https://www.dictionaryapi.com/api/v3/references/collegiate/json/${word}?key=${MW_API_KEY}`
-          const data = await fetchWithTimeout(url)
-          if (
-            Array.isArray(data) &&
-            typeof data[0] === 'object' &&
-            'shortdef' in data[0] &&
-            Array.isArray(data[0].shortdef) &&
-            data[0].shortdef.length > 0
-          ) {
-            checkValid.push(word)
-          }
-        } catch (_err) {
-          console.warn(`⚠️ Skipped word "${word}" due to fetch error or timeout.`)
-        }
-      }
+      const checkValid = await filterValidOneOffs(candidates)
 
       if (checkValid.length >= 6 && checkValid.length <= 20) {
         valid = checkValid
@@ -115,6 +83,13 @@ export async function GET(req: Request) {
     }
 
     if (valid.length < 6 || valid.length > 20) {
+      console.warn('⚠️ Puzzle generation failed', {
+        attempts,
+        lastTriedWord: startingWord,
+        validCount: valid.length,
+        timestamp: new Date().toISOString(),
+      })
+
       return new Response(JSON.stringify({ error: 'Invalid puzzle. Not created.' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
