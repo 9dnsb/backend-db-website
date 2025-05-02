@@ -1,7 +1,7 @@
 {
   "crons": [
     {
-      "path": "/api/queue-oneoff-puzzle",
+      "path": "/api/queue-oneoff-puzzle?secret=@cron_secret",
       "schedule": "0 5 * * *"
     }
   ]
