@@ -21,15 +21,32 @@ async function fetchWithTimeout<T = unknown>(url: string, ms = 5000): Promise<T>
 }
 
 export async function GET(req: Request) {
-  // ✅ Vercel cron sends: Authorization: Bearer <CRON_SECRET>
-  const auth = req.headers.get('authorization')
-  const token = auth?.startsWith('Bearer ') ? auth.slice(7) : null
+  const url = new URL(req.url)
+  const secret = url.searchParams.get('secret')
 
-  if (token !== CRON_SECRET) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+  if (secret !== process.env.CRON_SECRET) {
+    const reason = !secret ? 'Missing ?secret parameter' : 'Invalid ?secret value'
+
+    console.warn('❌ Unauthorized cron attempt', {
+      provided: secret,
+      expectedLength: process.env.CRON_SECRET?.length,
+      timestamp: new Date().toISOString(),
     })
+
+    return new Response(
+      JSON.stringify({
+        error: 'Unauthorized',
+        reason,
+        hint: 'Ensure vercel.json uses ?secret=@cron_secret and CRON_SECRET is set in env',
+      }),
+      {
+        status: 401,
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store',
+        },
+      },
+    )
   }
 
   try {
