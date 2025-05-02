@@ -21,23 +21,6 @@ const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
 
 export default buildConfig({
-  serverURL: process.env.PAYLOAD_PUBLIC_SERVER_URL,
-
-  jobs: {
-    tasks: [
-      {
-        slug: 'createOneOffPuzzle',
-        handler: './app/(payload)/jobs/createOneOffPuzzle',
-      },
-    ],
-    access: {
-      run: ({ req }) => {
-        if (req.user) return true
-        const authHeader = req.headers.get('authorization')
-        return authHeader === `Bearer ${process.env.CRON_SECRET}`
-      },
-    },
-  },
   admin: {
     user: Users.slug,
     importMap: {

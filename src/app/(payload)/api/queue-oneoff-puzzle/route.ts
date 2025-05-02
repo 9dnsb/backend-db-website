@@ -4,7 +4,6 @@ import { generateOneOffCandidates } from '@/utils/generateOneOffCandidates'
 import englishWords from 'an-array-of-english-words'
 
 const MW_API_KEY = process.env.MW_API_KEY as string
-const CRON_SECRET = process.env.CRON_SECRET as string
 const MAX_ATTEMPTS = 25
 
 const englishWordSet = new Set(englishWords)
