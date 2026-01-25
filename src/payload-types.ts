@@ -70,9 +70,7 @@ export interface Config {
     users: User;
     media: Media;
     'blog-posts': BlogPost;
-    puzzles: Puzzle;
-    mixandmatchpuzzles: Mixandmatchpuzzle;
-    oneoffpuzzles: Oneoffpuzzle;
+    'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
     'payload-migrations': PayloadMigration;
@@ -82,9 +80,7 @@ export interface Config {
     users: UsersSelect<false> | UsersSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
     'blog-posts': BlogPostsSelect<false> | BlogPostsSelect<true>;
-    puzzles: PuzzlesSelect<false> | PuzzlesSelect<true>;
-    mixandmatchpuzzles: MixandmatchpuzzlesSelect<false> | MixandmatchpuzzlesSelect<true>;
-    oneoffpuzzles: OneoffpuzzlesSelect<false> | OneoffpuzzlesSelect<true>;
+    'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
     'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
@@ -92,6 +88,7 @@ export interface Config {
   db: {
     defaultIDType: string;
   };
+  fallbackLocale: null;
   globals: {
     'about-me': AboutMe;
   };
@@ -141,6 +138,13 @@ export interface User {
   hash?: string | null;
   loginAttempts?: number | null;
   lockUntil?: string | null;
+  sessions?:
+    | {
+        id: string;
+        createdAt?: string | null;
+        expiresAt: string;
+      }[]
+    | null;
   password?: string | null;
 }
 /**
@@ -175,7 +179,7 @@ export interface BlogPost {
     root: {
       type: string;
       children: {
-        type: string;
+        type: any;
         version: number;
         [k: string]: unknown;
       }[];
@@ -199,97 +203,20 @@ export interface BlogPost {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "puzzles".
+ * via the `definition` "payload-kv".
  */
-export interface Puzzle {
+export interface PayloadKv {
   id: string;
-  publishedDate: string;
-  slug: string;
-  easyGroup: {
-    label: string;
-    words: {
-      word: string;
-      id?: string | null;
-    }[];
-  };
-  mediumGroup: {
-    label: string;
-    words: {
-      word: string;
-      id?: string | null;
-    }[];
-  };
-  hardGroup: {
-    label: string;
-    words: {
-      word: string;
-      id?: string | null;
-    }[];
-  };
-  trickyGroup: {
-    label: string;
-    words: {
-      word: string;
-      id?: string | null;
-    }[];
-  };
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "mixandmatchpuzzles".
- */
-export interface Mixandmatchpuzzle {
-  id: string;
-  publishedDate: string;
-  slug: string;
-  easyGroup: {
-    label: string;
-    words: {
-      word: string;
-      id?: string | null;
-    }[];
-  };
-  mediumGroup: {
-    label: string;
-    words: {
-      word: string;
-      id?: string | null;
-    }[];
-  };
-  hardGroup: {
-    label: string;
-    words: {
-      word: string;
-      id?: string | null;
-    }[];
-  };
-  trickyGroup: {
-    label: string;
-    words: {
-      word: string;
-      id?: string | null;
-    }[];
-  };
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "oneoffpuzzles".
- */
-export interface Oneoffpuzzle {
-  id: string;
-  publishedDate: string;
-  slug: string;
-  startingWord: string;
-  validAnswers: {
-    word: string;
-    id?: string | null;
-  }[];
-  updatedAt: string;
-  createdAt: string;
+  key: string;
+  data:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -309,18 +236,6 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'blog-posts';
         value: string | BlogPost;
-      } | null)
-    | ({
-        relationTo: 'puzzles';
-        value: string | Puzzle;
-      } | null)
-    | ({
-        relationTo: 'mixandmatchpuzzles';
-        value: string | Mixandmatchpuzzle;
-      } | null)
-    | ({
-        relationTo: 'oneoffpuzzles';
-        value: string | Oneoffpuzzle;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -379,6 +294,13 @@ export interface UsersSelect<T extends boolean = true> {
   hash?: T;
   loginAttempts?: T;
   lockUntil?: T;
+  sessions?:
+    | T
+    | {
+        id?: T;
+        createdAt?: T;
+        expiresAt?: T;
+      };
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -420,128 +342,11 @@ export interface BlogPostsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "puzzles_select".
+ * via the `definition` "payload-kv_select".
  */
-export interface PuzzlesSelect<T extends boolean = true> {
-  publishedDate?: T;
-  slug?: T;
-  easyGroup?:
-    | T
-    | {
-        label?: T;
-        words?:
-          | T
-          | {
-              word?: T;
-              id?: T;
-            };
-      };
-  mediumGroup?:
-    | T
-    | {
-        label?: T;
-        words?:
-          | T
-          | {
-              word?: T;
-              id?: T;
-            };
-      };
-  hardGroup?:
-    | T
-    | {
-        label?: T;
-        words?:
-          | T
-          | {
-              word?: T;
-              id?: T;
-            };
-      };
-  trickyGroup?:
-    | T
-    | {
-        label?: T;
-        words?:
-          | T
-          | {
-              word?: T;
-              id?: T;
-            };
-      };
-  updatedAt?: T;
-  createdAt?: T;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "mixandmatchpuzzles_select".
- */
-export interface MixandmatchpuzzlesSelect<T extends boolean = true> {
-  publishedDate?: T;
-  slug?: T;
-  easyGroup?:
-    | T
-    | {
-        label?: T;
-        words?:
-          | T
-          | {
-              word?: T;
-              id?: T;
-            };
-      };
-  mediumGroup?:
-    | T
-    | {
-        label?: T;
-        words?:
-          | T
-          | {
-              word?: T;
-              id?: T;
-            };
-      };
-  hardGroup?:
-    | T
-    | {
-        label?: T;
-        words?:
-          | T
-          | {
-              word?: T;
-              id?: T;
-            };
-      };
-  trickyGroup?:
-    | T
-    | {
-        label?: T;
-        words?:
-          | T
-          | {
-              word?: T;
-              id?: T;
-            };
-      };
-  updatedAt?: T;
-  createdAt?: T;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "oneoffpuzzles_select".
- */
-export interface OneoffpuzzlesSelect<T extends boolean = true> {
-  publishedDate?: T;
-  slug?: T;
-  startingWord?: T;
-  validAnswers?:
-    | T
-    | {
-        word?: T;
-        id?: T;
-      };
-  updatedAt?: T;
-  createdAt?: T;
+export interface PayloadKvSelect<T extends boolean = true> {
+  key?: T;
+  data?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -585,7 +390,7 @@ export interface AboutMe {
     root: {
       type: string;
       children: {
-        type: string;
+        type: any;
         version: number;
         [k: string]: unknown;
       }[];

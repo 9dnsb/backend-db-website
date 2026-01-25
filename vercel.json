@@ -1,8 +1,0 @@
-{
-  "crons": [
-    {
-      "path": "/api/queue-oneoff-puzzle?secret=1o7kjUe$apfa08@Xnv",
-      "schedule": "0 5 * * *"
-    }
-  ]
-}
