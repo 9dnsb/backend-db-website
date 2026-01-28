@@ -1,6 +1,7 @@
 import type { CollectionAfterChangeHook } from 'payload'
 import OpenAI, { toFile } from 'openai'
 import { getPayload } from 'payload'
+import { waitUntil } from '@vercel/functions'
 import config from '../payload.config'
 
 const openai = new OpenAI({
@@ -109,8 +110,9 @@ export const uploadToOpenAI: CollectionAfterChangeHook = ({
 
   log('Starting async processing', { docId, docUrl, docFilename, docTitle })
 
-  // Fire-and-forget: process in background without blocking save
-  void (async () => {
+  // Use waitUntil to keep the serverless function alive while processing
+  // This prevents Vercel from terminating the function before the async work completes
+  const processingPromise = (async () => {
     // Small delay to ensure the document is fully saved to the database
     await new Promise((resolve) => setTimeout(resolve, 1000))
     log('Getting fresh Payload instance', { docId })
@@ -191,6 +193,9 @@ export const uploadToOpenAI: CollectionAfterChangeHook = ({
       }
     }
   })()
+
+  // Keep the serverless function alive until processing completes
+  waitUntil(processingPromise)
 
   log('Returning doc immediately (async processing started)', { docId: doc.id })
   return doc
