@@ -18,7 +18,7 @@ export const deleteFromOpenAI: CollectionBeforeDeleteHook = async ({ req, id }) 
     // Delete vector store first (it references the file)
     if (doc.vectorStoreId) {
       try {
-        await openai.vectorStores.del(doc.vectorStoreId)
+        await openai.vectorStores.delete(doc.vectorStoreId)
         console.log(`Deleted vector store: ${doc.vectorStoreId}`)
       } catch (error) {
         console.error(`Failed to delete vector store ${doc.vectorStoreId}:`, error)
@@ -28,7 +28,7 @@ export const deleteFromOpenAI: CollectionBeforeDeleteHook = async ({ req, id }) 
     // Delete the file from OpenAI
     if (doc.openaiFileId) {
       try {
-        await openai.files.del(doc.openaiFileId)
+        await openai.files.delete(doc.openaiFileId)
         console.log(`Deleted OpenAI file: ${doc.openaiFileId}`)
       } catch (error) {
         console.error(`Failed to delete OpenAI file ${doc.openaiFileId}:`, error)
