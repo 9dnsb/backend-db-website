@@ -18,6 +18,57 @@ const logError = (step: string, error: unknown, data?: Record<string, unknown>) 
   })
 }
 
+/**
+ * Fetch PDF with retry logic for Vercel Blob storage.
+ * Blob URLs may not be immediately available after upload due to propagation delays.
+ */
+async function fetchPdfWithRetry(
+  url: string,
+  docId: string,
+  maxRetries = 5,
+  initialDelayMs = 2000,
+): Promise<Buffer> {
+  let lastError: Error | null = null
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const delay = initialDelayMs * Math.pow(2, attempt) // 2s, 4s, 8s, 16s, 32s
+
+    if (attempt > 0) {
+      log('Retrying PDF fetch', { docId, attempt, delayMs: delay, url })
+      await new Promise((resolve) => setTimeout(resolve, delay))
+    }
+
+    try {
+      const response = await fetch(url)
+
+      if (response.ok) {
+        const arrayBuffer = await response.arrayBuffer()
+        return Buffer.from(arrayBuffer)
+      }
+
+      // Only retry on 404 (blob not yet available) or 503 (service temporarily unavailable)
+      if (response.status === 404 || response.status === 503) {
+        lastError = new Error(`PDF not available yet: ${response.status} ${response.statusText}`)
+        log('PDF not yet available, will retry', { docId, attempt, status: response.status })
+        continue
+      }
+
+      // Other HTTP errors - fail immediately
+      throw new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`)
+    } catch (error) {
+      // Network errors - retry
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        lastError = error
+        log('Network error fetching PDF, will retry', { docId, attempt, error: error.message })
+        continue
+      }
+      throw error
+    }
+  }
+
+  throw lastError || new Error(`Failed to fetch PDF after ${maxRetries} retries`)
+}
+
 export const uploadToOpenAI: CollectionAfterChangeHook = ({
   doc,
   previousDoc,
@@ -77,14 +128,10 @@ export const uploadToOpenAI: CollectionAfterChangeHook = ({
       })
       log('Step 1/5: Status updated to processing', { docId })
 
-      // Fetch the PDF from Vercel Blob URL
+      // Fetch the PDF from Vercel Blob URL with retry logic
+      // Blob URLs may not be immediately available after upload due to propagation delays
       log('Step 2/5: Fetching PDF from Blob storage', { docId, url: docUrl })
-      const response = await fetch(docUrl)
-      if (!response.ok) {
-        throw new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`)
-      }
-      const arrayBuffer = await response.arrayBuffer()
-      const buffer = Buffer.from(arrayBuffer)
+      const buffer = await fetchPdfWithRetry(docUrl, docId)
       log('Step 2/5: PDF fetched successfully', { docId, sizeBytes: buffer.length })
 
       // 1. Upload file to OpenAI using toFile helper
