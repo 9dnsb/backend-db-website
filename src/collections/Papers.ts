@@ -41,7 +41,9 @@ export const Papers: CollectionConfig = {
       admin: {
         position: 'sidebar',
         readOnly: true,
-        description: 'OpenAI processing status',
+        components: {
+          Field: '@/components/fields/ProcessingStatus',
+        },
       },
     },
     {
