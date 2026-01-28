@@ -70,6 +70,7 @@ export interface Config {
     users: User;
     media: Media;
     'blog-posts': BlogPost;
+    papers: Paper;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -80,6 +81,7 @@ export interface Config {
     users: UsersSelect<false> | UsersSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
     'blog-posts': BlogPostsSelect<false> | BlogPostsSelect<true>;
+    papers: PapersSelect<false> | PapersSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -198,8 +200,49 @@ export interface BlogPost {
         id?: string | null;
       }[]
     | null;
+  /**
+   * Link an academic paper to enable AI-powered Q&A on this post
+   */
+  sourcePaper?: (string | null) | Paper;
   updatedAt: string;
   createdAt: string;
+}
+/**
+ * Academic papers for blog post AI chat
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "papers".
+ */
+export interface Paper {
+  id: string;
+  /**
+   * Title of the academic paper
+   */
+  title: string;
+  /**
+   * OpenAI processing status
+   */
+  processingStatus?: ('pending' | 'processing' | 'ready' | 'error') | null;
+  /**
+   * Auto-populated after upload
+   */
+  openaiFileId?: string | null;
+  /**
+   * Auto-populated after processing
+   */
+  vectorStoreId?: string | null;
+  errorMessage?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+  focalX?: number | null;
+  focalY?: number | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -236,6 +279,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'blog-posts';
         value: string | BlogPost;
+      } | null)
+    | ({
+        relationTo: 'papers';
+        value: string | Paper;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -337,8 +384,31 @@ export interface BlogPostsSelect<T extends boolean = true> {
         tag?: T;
         id?: T;
       };
+  sourcePaper?: T;
   updatedAt?: T;
   createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "papers_select".
+ */
+export interface PapersSelect<T extends boolean = true> {
+  title?: T;
+  processingStatus?: T;
+  openaiFileId?: T;
+  vectorStoreId?: T;
+  errorMessage?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  url?: T;
+  thumbnailURL?: T;
+  filename?: T;
+  mimeType?: T;
+  filesize?: T;
+  width?: T;
+  height?: T;
+  focalX?: T;
+  focalY?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

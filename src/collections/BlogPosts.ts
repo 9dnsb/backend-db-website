@@ -114,6 +114,15 @@ const BlogPosts: CollectionConfig = {
         },
       ],
     },
+    {
+      name: 'sourcePaper',
+      type: 'relationship',
+      relationTo: 'papers',
+      label: 'Source Paper (PDF)',
+      admin: {
+        description: 'Link an academic paper to enable AI-powered Q&A on this post',
+      },
+    },
   ],
   timestamps: true,
   hooks: {
