@@ -151,14 +151,16 @@ export const uploadToOpenAI: CollectionAfterChangeHook = ({
       })
       log('Step 4/5: Vector store created', { docId, vectorStoreId: vectorStore.id })
 
-      // 3. Add file to vector store and wait for indexing
-      log('Step 4/5: Adding file to vector store and polling for completion', { docId, vectorStoreId: vectorStore.id, fileId: file.id })
-      const vectorStoreFile = await openai.vectorStores.files.createAndPoll(vectorStore.id, {
+      // 3. Add file to vector store (don't wait for indexing - Vercel Hobby has 10s timeout)
+      log('Step 4/5: Adding file to vector store (not waiting for indexing)', { docId, vectorStoreId: vectorStore.id, fileId: file.id })
+      const vectorStoreFile = await openai.vectorStores.files.create(vectorStore.id, {
         file_id: file.id,
       })
-      log('Step 4/5: File indexed in vector store', { docId, status: vectorStoreFile.status })
+      log('Step 4/5: File added to vector store', { docId, status: vectorStoreFile.status })
 
       // 4. Update document with OpenAI IDs
+      // Status is 'ready' - the file is added and OpenAI will index it in the background
+      // The vector store can be used immediately, results will improve as indexing completes
       log('Step 5/5: Updating document with OpenAI IDs', { docId, openaiFileId: file.id, vectorStoreId: vectorStore.id })
       await payload.update({
         collection: 'papers',
