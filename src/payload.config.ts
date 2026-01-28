@@ -53,6 +53,7 @@ export default buildConfig({
     payloadCloudPlugin(),
     vercelBlobStorage({
       enabled: true,
+      addRandomSuffix: true, // Prevent filename collisions and ensure unique URLs
       collections: {
         media: true,
         papers: {
