@@ -35,14 +35,29 @@ export default buildConfig({
     url: process.env.DATABASE_URI || '',
   }),
   sharp,
-  email: nodemailerAdapter(),
+  email: nodemailerAdapter({
+    defaultFromAddress: 'noreply@example.com',
+    defaultFromName: 'DB Website',
+    transportOptions: process.env.SMTP_HOST
+      ? {
+          host: process.env.SMTP_HOST,
+          port: 587,
+          auth: {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS,
+          },
+        }
+      : undefined,
+  }),
   plugins: [
     payloadCloudPlugin(),
     vercelBlobStorage({
       enabled: true,
       collections: {
         media: true,
-        papers: true,
+        papers: {
+          disablePayloadAccessControl: true, // Papers have public read access, so use direct Blob URLs
+        },
       },
       token: process.env.BLOB_READ_WRITE_TOKEN || '',
     }),

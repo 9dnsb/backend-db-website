@@ -60,6 +60,8 @@ export const uploadToOpenAI: CollectionAfterChangeHook = ({
 
   // Fire-and-forget: process in background without blocking save
   void (async () => {
+    // Small delay to ensure the document is fully saved to the database
+    await new Promise((resolve) => setTimeout(resolve, 1000))
     log('Getting fresh Payload instance', { docId })
     const payload = await getPayload({ config })
     log('Got Payload instance', { docId })
