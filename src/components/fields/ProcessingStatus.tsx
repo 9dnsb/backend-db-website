@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useField, useDocumentInfo } from '@payloadcms/ui'
 
 type Status = 'pending' | 'processing' | 'ready' | 'error'
@@ -16,45 +16,60 @@ export default function ProcessingStatus({ path }: { path: string }) {
   const { value } = useField<Status>({ path })
   const { id } = useDocumentInfo()
   const [currentStatus, setCurrentStatus] = useState<Status>(value || 'pending')
-  const [isPolling, setIsPolling] = useState(false)
+  const hasRefreshed = useRef(false)
 
   const fetchStatus = useCallback(async () => {
-    if (!id) return
+    if (!id) return null
 
     try {
       const response = await fetch(`/api/papers/${id}?depth=0`)
       if (response.ok) {
         const data = await response.json()
-        const newStatus = data.processingStatus as Status
-        setCurrentStatus(newStatus)
-
-        // If status changed to ready or error, stop polling and refresh the page
-        if (newStatus === 'ready' || newStatus === 'error') {
-          setIsPolling(false)
-          // Refresh the page to show updated data
-          window.location.reload()
-        }
+        return data.processingStatus as Status
       }
     } catch (error) {
       console.error('Failed to fetch status:', error)
     }
+    return null
   }, [id])
 
-  // Start polling when status is pending or processing
+  // Sync local state with field value
   useEffect(() => {
-    if (value === 'pending' || value === 'processing') {
-      setIsPolling(true)
-    }
     setCurrentStatus(value || 'pending')
   }, [value])
 
-  // Poll every 3 seconds while processing
+  // Poll while status is pending or processing
   useEffect(() => {
-    if (!isPolling || !id) return
+    if (!id) return
 
-    const interval = setInterval(fetchStatus, 3000)
-    return () => clearInterval(interval)
-  }, [isPolling, id, fetchStatus])
+    const shouldPoll = currentStatus === 'pending' || currentStatus === 'processing'
+    if (!shouldPoll) return
+
+    // Fetch immediately on mount, then every 3 seconds
+    const poll = async () => {
+      const newStatus = await fetchStatus()
+      if (newStatus) {
+        setCurrentStatus(newStatus)
+
+        // If completed, refresh page once to show updated data
+        if ((newStatus === 'ready' || newStatus === 'error') && !hasRefreshed.current) {
+          hasRefreshed.current = true
+          window.location.reload()
+        }
+      }
+    }
+
+    // Initial fetch after a short delay (give backend time to start processing)
+    const initialTimeout = setTimeout(poll, 1500)
+
+    // Then poll every 3 seconds
+    const interval = setInterval(poll, 3000)
+
+    return () => {
+      clearTimeout(initialTimeout)
+      clearInterval(interval)
+    }
+  }, [id, currentStatus, fetchStatus])
 
   const config = statusConfig[currentStatus] || statusConfig.pending
   const showSpinner = currentStatus === 'pending' || currentStatus === 'processing'
