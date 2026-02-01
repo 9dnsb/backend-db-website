@@ -3,7 +3,6 @@ import OpenAI, { toFile } from 'openai'
 import { getPayload } from 'payload'
 import { waitUntil } from '@vercel/functions'
 import config from '../payload.config'
-import { generateBlogFromPaper } from './generateBlogFromPaper'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -176,11 +175,7 @@ export const uploadToOpenAI: CollectionAfterChangeHook = ({
       log('Step 5/6: Document updated successfully', { docId })
 
       log('COMPLETE: Paper processed successfully', { docId, title: docTitle, openaiFileId: file.id, vectorStoreId: vectorStore.id })
-
-      // 5. Trigger blog post generation
-      log('Step 6/6: Starting blog generation', { docId, title: docTitle, vectorStoreId: vectorStore.id })
-      await generateBlogFromPaper(docId, docTitle, vectorStore.id)
-      log('Step 6/6: Blog generation complete', { docId })
+      log('Blog generation can be triggered manually via admin UI', { docId })
     } catch (error) {
       logError('Processing failed', error, { docId, docTitle })
 

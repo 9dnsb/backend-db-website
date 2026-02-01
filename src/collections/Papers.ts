@@ -101,7 +101,9 @@ export const Papers: CollectionConfig = {
       admin: {
         position: 'sidebar',
         readOnly: true,
-        description: 'Status of blog post generation',
+        components: {
+          Field: '@/components/fields/BlogGenerationStatus',
+        },
       },
     },
     {
@@ -111,6 +113,27 @@ export const Papers: CollectionConfig = {
         position: 'sidebar',
         readOnly: true,
         condition: (data) => data?.blogGenerationStatus === 'error',
+      },
+    },
+    // Fields for manual multi-step blog generation
+    {
+      name: 'blogThreadId',
+      type: 'text',
+      admin: {
+        position: 'sidebar',
+        readOnly: true,
+        description: 'OpenAI thread ID for blog generation',
+        condition: (data) => !!data?.blogThreadId,
+      },
+    },
+    {
+      name: 'blogRunId',
+      type: 'text',
+      admin: {
+        position: 'sidebar',
+        readOnly: true,
+        description: 'OpenAI run ID for blog generation',
+        condition: (data) => !!data?.blogRunId,
       },
     },
   ],
