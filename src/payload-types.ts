@@ -204,6 +204,10 @@ export interface BlogPost {
    * Link an academic paper to enable AI-powered Q&A on this post
    */
   sourcePaper?: (string | null) | Paper;
+  /**
+   * Only published posts are visible on the site
+   */
+  status?: ('draft' | 'published') | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -219,9 +223,6 @@ export interface Paper {
    * Title of the academic paper
    */
   title: string;
-  /**
-   * OpenAI processing status
-   */
   processingStatus?: ('pending' | 'processing' | 'ready' | 'error') | null;
   /**
    * Auto-populated after upload
@@ -232,6 +233,15 @@ export interface Paper {
    */
   vectorStoreId?: string | null;
   errorMessage?: string | null;
+  /**
+   * Auto-generated blog post from this paper
+   */
+  generatedBlogPost?: (string | null) | BlogPost;
+  /**
+   * Status of blog post generation
+   */
+  blogGenerationStatus?: ('pending' | 'generating' | 'completed' | 'error' | 'skipped') | null;
+  blogGenerationError?: string | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -385,6 +395,7 @@ export interface BlogPostsSelect<T extends boolean = true> {
         id?: T;
       };
   sourcePaper?: T;
+  status?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -398,6 +409,9 @@ export interface PapersSelect<T extends boolean = true> {
   openaiFileId?: T;
   vectorStoreId?: T;
   errorMessage?: T;
+  generatedBlogPost?: T;
+  blogGenerationStatus?: T;
+  blogGenerationError?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;

@@ -13,7 +13,7 @@ const BlogPosts: CollectionConfig = {
   slug: 'blog-posts',
   admin: {
     useAsTitle: 'title',
-    defaultColumns: ['title', 'author', 'publishedDate'],
+    defaultColumns: ['title', 'status', 'author', 'publishedDate'],
   },
   access: {
     read: () => true,
@@ -121,6 +121,19 @@ const BlogPosts: CollectionConfig = {
       label: 'Source Paper (PDF)',
       admin: {
         description: 'Link an academic paper to enable AI-powered Q&A on this post',
+      },
+    },
+    {
+      name: 'status',
+      type: 'select',
+      defaultValue: 'draft',
+      options: [
+        { label: 'Draft', value: 'draft' },
+        { label: 'Published', value: 'published' },
+      ],
+      admin: {
+        position: 'sidebar',
+        description: 'Only published posts are visible on the site',
       },
     },
   ],

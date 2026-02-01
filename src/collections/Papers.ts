@@ -75,6 +75,44 @@ export const Papers: CollectionConfig = {
         condition: (data) => data?.processingStatus === 'error',
       },
     },
+    // Blog generation fields
+    {
+      name: 'generatedBlogPost',
+      type: 'relationship',
+      relationTo: 'blog-posts',
+      admin: {
+        position: 'sidebar',
+        readOnly: true,
+        description: 'Auto-generated blog post from this paper',
+        condition: (data) => !!data?.generatedBlogPost,
+      },
+    },
+    {
+      name: 'blogGenerationStatus',
+      type: 'select',
+      defaultValue: 'pending',
+      options: [
+        { label: 'Pending', value: 'pending' },
+        { label: 'Generating', value: 'generating' },
+        { label: 'Completed', value: 'completed' },
+        { label: 'Error', value: 'error' },
+        { label: 'Skipped', value: 'skipped' },
+      ],
+      admin: {
+        position: 'sidebar',
+        readOnly: true,
+        description: 'Status of blog post generation',
+      },
+    },
+    {
+      name: 'blogGenerationError',
+      type: 'text',
+      admin: {
+        position: 'sidebar',
+        readOnly: true,
+        condition: (data) => data?.blogGenerationStatus === 'error',
+      },
+    },
   ],
   upload: {
     mimeTypes: ['application/pdf'],

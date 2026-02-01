@@ -3,6 +3,7 @@ import OpenAI, { toFile } from 'openai'
 import { getPayload } from 'payload'
 import { waitUntil } from '@vercel/functions'
 import config from '../payload.config'
+import { generateBlogFromPaper } from './generateBlogFromPaper'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -161,7 +162,7 @@ export const uploadToOpenAI: CollectionAfterChangeHook = ({
       // 4. Update document with OpenAI IDs
       // Status is 'ready' - the file is added and OpenAI will index it in the background
       // The vector store can be used immediately, results will improve as indexing completes
-      log('Step 5/5: Updating document with OpenAI IDs', { docId, openaiFileId: file.id, vectorStoreId: vectorStore.id })
+      log('Step 5/6: Updating document with OpenAI IDs', { docId, openaiFileId: file.id, vectorStoreId: vectorStore.id })
       await payload.update({
         collection: 'papers',
         id: docId,
@@ -172,9 +173,14 @@ export const uploadToOpenAI: CollectionAfterChangeHook = ({
         },
         context: { skipOpenAIUpload: true },
       })
-      log('Step 5/5: Document updated successfully', { docId })
+      log('Step 5/6: Document updated successfully', { docId })
 
       log('COMPLETE: Paper processed successfully', { docId, title: docTitle, openaiFileId: file.id, vectorStoreId: vectorStore.id })
+
+      // 5. Trigger blog post generation
+      log('Step 6/6: Starting blog generation', { docId, title: docTitle, vectorStoreId: vectorStore.id })
+      await generateBlogFromPaper(docId, docTitle, vectorStore.id)
+      log('Step 6/6: Blog generation complete', { docId })
     } catch (error) {
       logError('Processing failed', error, { docId, docTitle })
 
