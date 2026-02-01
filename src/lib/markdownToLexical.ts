@@ -3,6 +3,17 @@
  * Supports: headings, paragraphs, bold, italic, links, lists, blockquotes, horizontal rules
  */
 
+const LOG_PREFIX = '[MARKDOWN->LEXICAL]'
+const DEBUG = process.env.NODE_ENV !== 'production' // Set to false to reduce log verbosity
+
+const log = (message: string, data?: Record<string, unknown>) => {
+  if (!DEBUG) return
+  console.log(`${LOG_PREFIX} ${message}`)
+  if (data) {
+    console.log(`${LOG_PREFIX} └─`, JSON.stringify(data, null, 2))
+  }
+}
+
 type LexicalNode = {
   type: string
   version: number
@@ -298,8 +309,21 @@ export function markdownToLexical(markdown: string): {
     indent: number
   }
 } {
+  console.log(`${LOG_PREFIX} Starting markdown conversion`)
+  console.log(`${LOG_PREFIX} Input length: ${markdown.length} characters`)
+
   const lines = markdown.split('\n')
+  console.log(`${LOG_PREFIX} Total lines: ${lines.length}`)
+
   const children: LexicalNode[] = []
+  const stats = {
+    headings: 0,
+    paragraphs: 0,
+    lists: 0,
+    blockquotes: 0,
+    horizontalRules: 0,
+    emptyLines: 0,
+  }
 
   let i = 0
   while (i < lines.length) {
@@ -308,13 +332,16 @@ export function markdownToLexical(markdown: string): {
 
     // Skip empty lines
     if (!trimmedLine) {
+      stats.emptyLines++
       i++
       continue
     }
 
     // Horizontal rule: ---, ***, ___
     if (/^(-{3,}|\*{3,}|_{3,})$/.test(trimmedLine)) {
+      log(`Line ${i + 1}: Horizontal rule`)
       children.push(createHorizontalRuleNode())
+      stats.horizontalRules++
       i++
       continue
     }
@@ -325,7 +352,9 @@ export function markdownToLexical(markdown: string): {
       const level = headingMatch[1].length as 1 | 2 | 3 | 4 | 5 | 6
       const headingText = headingMatch[2]
       const tag = `h${level}` as 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
+      log(`Line ${i + 1}: Heading ${tag}`, { text: headingText.slice(0, 50) })
       children.push(createHeadingNode(tag, parseInlineFormatting(headingText)))
+      stats.headings++
       i++
       continue
     }
@@ -333,41 +362,51 @@ export function markdownToLexical(markdown: string): {
     // Blockquote: > text
     if (trimmedLine.startsWith('>')) {
       const quoteLines: string[] = []
+      const startLine = i + 1
       while (i < lines.length && lines[i].trim().startsWith('>')) {
         quoteLines.push(lines[i].trim().replace(/^>\s?/, ''))
         i++
       }
       const quoteText = quoteLines.join(' ')
+      log(`Lines ${startLine}-${i}: Blockquote`, { lines: quoteLines.length, preview: quoteText.slice(0, 50) })
       children.push(createQuoteNode(parseInlineFormatting(quoteText)))
+      stats.blockquotes++
       continue
     }
 
     // Unordered list: - item or * item
     if (/^[-*]\s+/.test(trimmedLine)) {
       const listItems: LexicalNode[][] = []
+      const startLine = i + 1
       while (i < lines.length && /^[-*]\s+/.test(lines[i].trim())) {
         const itemText = lines[i].trim().replace(/^[-*]\s+/, '')
         listItems.push(parseInlineFormatting(itemText))
         i++
       }
+      log(`Lines ${startLine}-${i}: Unordered list`, { items: listItems.length })
       children.push(createListNode('bullet', listItems))
+      stats.lists++
       continue
     }
 
     // Ordered list: 1. item
     if (/^\d+\.\s+/.test(trimmedLine)) {
       const listItems: LexicalNode[][] = []
+      const startLine = i + 1
       while (i < lines.length && /^\d+\.\s+/.test(lines[i].trim())) {
         const itemText = lines[i].trim().replace(/^\d+\.\s+/, '')
         listItems.push(parseInlineFormatting(itemText))
         i++
       }
+      log(`Lines ${startLine}-${i}: Ordered list`, { items: listItems.length })
       children.push(createListNode('number', listItems))
+      stats.lists++
       continue
     }
 
     // Regular paragraph
     const paragraphLines: string[] = []
+    const startLine = i + 1
     while (
       i < lines.length &&
       lines[i].trim() &&
@@ -382,9 +421,16 @@ export function markdownToLexical(markdown: string): {
     }
     if (paragraphLines.length > 0) {
       const paragraphText = paragraphLines.join(' ')
+      log(`Lines ${startLine}-${i}: Paragraph`, { lines: paragraphLines.length, preview: paragraphText.slice(0, 50) })
       children.push(createParagraphNode(parseInlineFormatting(paragraphText)))
+      stats.paragraphs++
     }
   }
+
+  console.log(`${LOG_PREFIX} ✓ Conversion complete`)
+  console.log(`${LOG_PREFIX} Stats:`, JSON.stringify(stats))
+  console.log(`${LOG_PREFIX} Total Lexical nodes: ${children.length}`)
+  console.log(`${LOG_PREFIX} Node types:`, children.map((c) => c.type).join(', '))
 
   return {
     root: {

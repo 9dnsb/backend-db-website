@@ -7,15 +7,28 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
 
+const LOG_PREFIX = '[BLOG GENERATION]'
+
 const log = (step: string, data?: Record<string, unknown>) => {
-  console.log(`[BLOG GENERATION] ${step}`, data ? JSON.stringify(data, null, 2) : '')
+  const timestamp = new Date().toISOString()
+  console.log(`${LOG_PREFIX} [${timestamp}] ${step}`)
+  if (data) {
+    console.log(`${LOG_PREFIX} └─ Data:`, JSON.stringify(data, null, 2))
+  }
 }
 
 const logError = (step: string, error: unknown, data?: Record<string, unknown>) => {
-  console.error(`[BLOG GENERATION ERROR] ${step}`, {
-    error: error instanceof Error ? { message: error.message, stack: error.stack } : error,
-    ...data,
-  })
+  const timestamp = new Date().toISOString()
+  console.error(`${LOG_PREFIX} [${timestamp}] ❌ ERROR: ${step}`)
+  if (error instanceof Error) {
+    console.error(`${LOG_PREFIX} └─ Message: ${error.message}`)
+    console.error(`${LOG_PREFIX} └─ Stack: ${error.stack}`)
+  } else {
+    console.error(`${LOG_PREFIX} └─ Error:`, error)
+  }
+  if (data) {
+    console.error(`${LOG_PREFIX} └─ Context:`, JSON.stringify(data, null, 2))
+  }
 }
 
 /**
@@ -86,38 +99,51 @@ export async function generateBlogFromPaper(
   paperTitle: string,
   vectorStoreId: string
 ): Promise<void> {
-  log('Starting blog generation', { paperId, paperTitle, vectorStoreId })
+  console.log('\n' + '='.repeat(60))
+  log('🚀 STARTING BLOG GENERATION')
+  log('Input parameters', { paperId, paperTitle, vectorStoreId })
+  console.log('='.repeat(60))
 
   const payload = await getPayload({ config })
+  log('Step 1/8: Payload instance acquired')
 
   try {
     // Update status to generating
+    log('Step 2/8: Updating paper status to "generating"')
     await payload.update({
       collection: 'papers',
       id: paperId,
       data: { blogGenerationStatus: 'generating' },
       context: { skipOpenAIUpload: true },
     })
+    log('Step 2/8: ✓ Paper status updated')
 
     // Check if paper already has a generated blog post
+    log('Step 3/8: Checking for existing blog post')
     const paper = await payload.findByID({
       collection: 'papers',
       id: paperId,
     })
+    log('Step 3/8: Paper fetched', {
+      hasExistingBlogPost: !!paper.generatedBlogPost,
+      existingBlogPostId: paper.generatedBlogPost || null,
+    })
 
     if (paper.generatedBlogPost) {
-      log('Paper already has generated blog post, skipping', { paperId })
+      log('⚠️ Paper already has generated blog post - SKIPPING', { paperId })
       await payload.update({
         collection: 'papers',
         id: paperId,
         data: { blogGenerationStatus: 'skipped' },
         context: { skipOpenAIUpload: true },
       })
+      console.log('='.repeat(60) + '\n')
       return
     }
 
     // Create a thread with the vector store attached
-    log('Creating OpenAI thread with vector store', { vectorStoreId })
+    log('Step 4/8: Creating OpenAI thread with vector store')
+    log('Step 4/8: Vector store ID being used', { vectorStoreId })
     const thread = await openai.beta.threads.create({
       tool_resources: {
         file_search: {
@@ -125,12 +151,11 @@ export async function generateBlogFromPaper(
         },
       },
     })
-    log('Thread created', { threadId: thread.id })
+    log('Step 4/8: ✓ Thread created', { threadId: thread.id })
 
     // Add the user message requesting blog generation
-    await openai.beta.threads.messages.create(thread.id, {
-      role: 'user',
-      content: `Please read and analyze the attached academic paper titled "${paperTitle}" using the file_search tool. Then write a blog post about it following the style guidelines in your instructions.
+    log('Step 5/8: Adding user message to thread')
+    const userMessageContent = `Please read and analyze the attached academic paper titled "${paperTitle}" using the file_search tool. Then write a blog post about it following the style guidelines in your instructions.
 
 Focus on:
 1. The main research question and why it matters
@@ -138,73 +163,148 @@ Focus on:
 3. The key findings with specific numbers
 4. The practical implications for readers
 
-Remember to use the exact section structure and emoji headers specified in your instructions.`,
+Remember to use the exact section structure and emoji headers specified in your instructions.`
+
+    await openai.beta.threads.messages.create(thread.id, {
+      role: 'user',
+      content: userMessageContent,
     })
+    log('Step 5/8: ✓ User message added', { messageLength: userMessageContent.length })
+
+    // Get or create assistant
+    log('Step 6/8: Getting/creating blog assistant')
+    const assistantId = await getOrCreateBlogAssistant()
+    log('Step 6/8: ✓ Assistant ready', { assistantId })
 
     // Run the assistant
-    log('Running assistant to generate blog', { paperId })
+    log('Step 6/8: Running assistant (this may take 30-60 seconds)...')
+    const runStartTime = Date.now()
     const run = await openai.beta.threads.runs.createAndPoll(thread.id, {
-      assistant_id: await getOrCreateBlogAssistant(),
+      assistant_id: assistantId,
       tool_choice: { type: 'file_search' },
+    })
+    const runDuration = ((Date.now() - runStartTime) / 1000).toFixed(1)
+
+    log('Step 6/8: Run completed', {
+      status: run.status,
+      durationSeconds: runDuration,
+      runId: run.id,
+      usage: run.usage,
     })
 
     if (run.status !== 'completed') {
-      throw new Error(`Run failed with status: ${run.status}`)
+      log('Step 6/8: ❌ Run did NOT complete successfully', {
+        status: run.status,
+        lastError: run.last_error,
+        failedAt: run.failed_at,
+        incompleteDetails: run.incomplete_details,
+      })
+      throw new Error(`Run failed with status: ${run.status}. Last error: ${JSON.stringify(run.last_error)}`)
     }
 
     // Get the generated content
+    log('Step 7/8: Fetching assistant response')
     const messages = await openai.beta.threads.messages.list(thread.id)
+    log('Step 7/8: Messages fetched', {
+      totalMessages: messages.data.length,
+      messageRoles: messages.data.map((m) => m.role),
+    })
+
     const assistantMessage = messages.data.find((m) => m.role === 'assistant')
 
-    if (!assistantMessage || assistantMessage.content[0].type !== 'text') {
-      throw new Error('No text response from assistant')
+    if (!assistantMessage) {
+      log('Step 7/8: ❌ No assistant message found in thread')
+      throw new Error('No assistant message found in thread')
+    }
+
+    log('Step 7/8: Assistant message found', {
+      contentBlocks: assistantMessage.content.length,
+      contentTypes: assistantMessage.content.map((c) => c.type),
+    })
+
+    if (assistantMessage.content[0].type !== 'text') {
+      log('Step 7/8: ❌ First content block is not text', {
+        actualType: assistantMessage.content[0].type,
+      })
+      throw new Error(`Expected text response, got: ${assistantMessage.content[0].type}`)
     }
 
     const markdownContent = assistantMessage.content[0].text.value
-    log('Blog content generated', { paperId, contentLength: markdownContent.length })
+    log('Step 7/8: ✓ Markdown content extracted', {
+      contentLength: markdownContent.length,
+      preview: markdownContent.slice(0, 200) + '...',
+      hasAnnotations: assistantMessage.content[0].text.annotations?.length || 0,
+    })
 
     // Extract title from markdown (first line starting with #)
     const titleMatch = markdownContent.match(/^#\s+(.+)$/m)
     const blogTitle = titleMatch ? titleMatch[1].trim() : `Summary: ${paperTitle}`
+    log('Step 7/8: Title extracted', {
+      foundInMarkdown: !!titleMatch,
+      extractedTitle: blogTitle,
+    })
 
     // Generate slug from title
     const baseSlug = generateSlug(blogTitle)
     const timestamp = Date.now()
     const slug = `${baseSlug}-${timestamp}`
+    log('Step 7/8: Slug generated', { baseSlug, timestamp, finalSlug: slug })
 
     // Convert markdown to Lexical format
+    log('Step 7/8: Converting markdown to Lexical format')
     const lexicalContent = markdownToLexical(markdownContent)
+    log('Step 7/8: ✓ Lexical conversion complete', {
+      rootChildrenCount: lexicalContent.root.children.length,
+      nodeTypes: lexicalContent.root.children.map((c) => c.type),
+    })
 
     // Get admin user for author (first admin user)
+    log('Step 8/8: Finding admin user for author')
     const adminUsers = await payload.find({
       collection: 'users',
       where: { role: { equals: 'admin' } },
       limit: 1,
     })
     const authorId = adminUsers.docs[0]?.id
+    log('Step 8/8: Admin user search result', {
+      found: !!authorId,
+      authorId: authorId || 'NOT FOUND',
+      totalAdminUsers: adminUsers.totalDocs,
+    })
 
     if (!authorId) {
-      throw new Error('No admin user found to set as author')
+      throw new Error('No admin user found to set as author. Please ensure at least one admin user exists.')
     }
 
     // Create the blog post
-    log('Creating blog post', { paperId, slug, blogTitle })
+    log('Step 8/8: Creating blog post in database')
+    const blogPostData = {
+      title: blogTitle,
+      slug,
+      content: lexicalContent,
+      excerpt: `AI-generated summary of the research paper: ${paperTitle}`,
+      publishedDate: new Date().toISOString(),
+      author: authorId,
+      sourcePaper: paperId,
+      status: 'draft' as const,
+    }
+    log('Step 8/8: Blog post data prepared', {
+      title: blogPostData.title,
+      slug: blogPostData.slug,
+      excerptLength: blogPostData.excerpt.length,
+      authorId: blogPostData.author,
+      sourcePaperId: blogPostData.sourcePaper,
+      status: blogPostData.status,
+    })
+
     const blogPost = await payload.create({
       collection: 'blog-posts',
-      data: {
-        title: blogTitle,
-        slug,
-        content: lexicalContent,
-        excerpt: `AI-generated summary of the research paper: ${paperTitle}`,
-        publishedDate: new Date().toISOString(),
-        author: authorId,
-        sourcePaper: paperId,
-        status: 'draft',
-      },
+      data: blogPostData,
     })
-    log('Blog post created', { paperId, blogPostId: blogPost.id })
+    log('Step 8/8: ✓ Blog post created', { blogPostId: blogPost.id })
 
     // Update paper with the generated blog post reference
+    log('Step 8/8: Linking blog post to paper')
     await payload.update({
       collection: 'papers',
       id: paperId,
@@ -214,32 +314,48 @@ Remember to use the exact section structure and emoji headers specified in your 
       },
       context: { skipOpenAIUpload: true },
     })
+    log('Step 8/8: ✓ Paper updated with blog post reference')
 
-    log('COMPLETE: Blog generated successfully', {
+    // Clean up thread
+    log('Cleanup: Deleting OpenAI thread')
+    await openai.beta.threads.del(thread.id)
+    log('Cleanup: ✓ Thread deleted')
+
+    console.log('='.repeat(60))
+    log('🎉 BLOG GENERATION COMPLETE!')
+    log('Summary', {
       paperId,
+      paperTitle,
       blogPostId: blogPost.id,
       blogTitle,
       slug,
+      contentLength: markdownContent.length,
+      lexicalNodes: lexicalContent.root.children.length,
     })
+    console.log('='.repeat(60) + '\n')
 
-    // Clean up thread
-    await openai.beta.threads.del(thread.id)
   } catch (error) {
-    logError('Blog generation failed', error, { paperId, paperTitle })
+    console.log('='.repeat(60))
+    logError('Blog generation failed', error, { paperId, paperTitle, vectorStoreId })
+    console.log('='.repeat(60))
 
     try {
+      log('Attempting to save error status to paper')
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       await payload.update({
         collection: 'papers',
         id: paperId,
         data: {
           blogGenerationStatus: 'error',
-          blogGenerationError: error instanceof Error ? error.message : 'Unknown error',
+          blogGenerationError: errorMessage.slice(0, 500), // Limit error message length
         },
         context: { skipOpenAIUpload: true },
       })
+      log('Error status saved to paper', { errorMessage: errorMessage.slice(0, 100) })
     } catch (updateError) {
-      logError('Failed to update error status', updateError, { paperId })
+      logError('Failed to save error status to paper', updateError, { paperId })
     }
+    console.log('='.repeat(60) + '\n')
   }
 }
 
@@ -249,24 +365,42 @@ Remember to use the exact section structure and emoji headers specified in your 
 let cachedAssistantId: string | null = null
 
 async function getOrCreateBlogAssistant(): Promise<string> {
+  log('getOrCreateBlogAssistant: Checking for cached assistant')
+
   if (cachedAssistantId) {
+    log('getOrCreateBlogAssistant: Using cached assistant ID', { assistantId: cachedAssistantId })
     return cachedAssistantId
   }
 
   const assistantName = 'Blog Post Generator'
+  log('getOrCreateBlogAssistant: No cache, searching for existing assistant', { assistantName })
 
   // Check if assistant already exists
   const assistants = await openai.beta.assistants.list({ limit: 100 })
+  log('getOrCreateBlogAssistant: Fetched assistants list', {
+    totalAssistants: assistants.data.length,
+    assistantNames: assistants.data.map((a) => a.name),
+  })
+
   const existing = assistants.data.find((a) => a.name === assistantName)
 
   if (existing) {
     cachedAssistantId = existing.id
-    log('Using existing assistant', { assistantId: existing.id })
+    log('getOrCreateBlogAssistant: ✓ Found existing assistant', {
+      assistantId: existing.id,
+      model: existing.model,
+      tools: existing.tools.map((t) => t.type),
+    })
     return existing.id
   }
 
   // Create new assistant
-  log('Creating new blog assistant')
+  log('getOrCreateBlogAssistant: No existing assistant found, creating new one')
+  log('getOrCreateBlogAssistant: System prompt length', {
+    promptLength: BLOG_SYSTEM_PROMPT.length,
+    promptPreview: BLOG_SYSTEM_PROMPT.slice(0, 100) + '...',
+  })
+
   const assistant = await openai.beta.assistants.create({
     name: assistantName,
     instructions: BLOG_SYSTEM_PROMPT,
@@ -275,6 +409,10 @@ async function getOrCreateBlogAssistant(): Promise<string> {
   })
 
   cachedAssistantId = assistant.id
-  log('Created new assistant', { assistantId: assistant.id })
+  log('getOrCreateBlogAssistant: ✓ Created new assistant', {
+    assistantId: assistant.id,
+    model: assistant.model,
+    name: assistant.name,
+  })
   return assistant.id
 }
