@@ -318,7 +318,7 @@ Remember to use the exact section structure and emoji headers specified in your 
 
     // Clean up thread
     log('Cleanup: Deleting OpenAI thread')
-    await openai.beta.threads.del(thread.id)
+    await openai.beta.threads.delete(thread.id)
     log('Cleanup: ✓ Thread deleted')
 
     console.log('='.repeat(60))

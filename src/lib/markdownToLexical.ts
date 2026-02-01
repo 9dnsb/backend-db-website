@@ -296,6 +296,8 @@ function parseInlineFormatting(text: string): LexicalNode[] {
   return nodes
 }
 
+type LexicalFormat = '' | 'left' | 'start' | 'center' | 'right' | 'end' | 'justify'
+
 /**
  * Convert markdown string to Lexical editor state
  */
@@ -305,7 +307,7 @@ export function markdownToLexical(markdown: string): {
     version: number
     children: LexicalNode[]
     direction: 'ltr' | 'rtl' | null
-    format: string
+    format: LexicalFormat
     indent: number
   }
 } {
@@ -438,7 +440,7 @@ export function markdownToLexical(markdown: string): {
       version: 1,
       children,
       direction: 'ltr',
-      format: '',
+      format: '' as LexicalFormat,
       indent: 0,
     },
   }
