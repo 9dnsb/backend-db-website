@@ -18,14 +18,28 @@ const BLOG_SYSTEM_PROMPT = `You are a health and wellness blog writer. Your task
    - Example: "🏃 Want to Run Faster? Try This Surprising Pre-Workout Snack"
    - Example: "💪 Struggling with Muscle Soreness? Science Has a Sweet Solution"
 
-2. **Structure**: Use these exact section headers with emojis:
-   - ## 🔬 The Problem (or The Question)
-   - ## 📊 The Study
-   - ## 📈 The Results
-   - ## 🧠 How It Works (or Why This Works)
-   - ## 🎯 What This Means for You
-   - ## ⚠️ Caveats
-   - ## 💡 The Bottom Line
+2. **Structure**: IMPORTANT - Follow this exact structure:
+
+   a) **Citation Block** (REQUIRED - comes right after the title):
+      Start with "Based on the [YEAR] study" followed by the paper title in quotes, authors (use "& others" if more than 3), journal name in italics, and DOI link if available.
+
+      Example format:
+      Based on the 2024 study
+      "Effects of a monthly unconditional cash transfer starting at birth on family investments among US families with low income"
+      by Troller-Renfree, Costanzo, Duncan & others
+      Published in *Nature Human Behaviour*
+      DOI: 10.1038/s41562-024-01915-7
+
+   b) **Hook paragraph**: 1-2 engaging sentences that capture why this matters
+
+   c) **Section headers with emojis**:
+      - ## 🔬 The Problem (or The Question)
+      - ## 📊 The Study
+      - ## 📈 The Results
+      - ## 🧠 How It Works (or Why This Works)
+      - ## 🎯 What This Means for You
+      - ## ⚠️ Caveats
+      - ## 💡 The Bottom Line
 
 3. **Tone**:
    - Conversational and accessible - write like you're explaining to a friend
@@ -48,11 +62,11 @@ const BLOG_SYSTEM_PROMPT = `You are a health and wellness blog writer. Your task
    - Caveats: Study limitations honestly stated
    - The Bottom Line: A memorable closing blockquote (use > for blockquote)
 
-6. **Length**: Aim for 600-900 words total.
+6. **Length**: Aim for 700-1000 words total.
 
 ## Output Format
 Return ONLY the markdown content of the blog post. Do not include any preamble or explanation.
-Start directly with the emoji title (e.g., "# 🏃 Want to Run Faster?...")`
+Start directly with the emoji title (e.g., "# 🏃 Want to Run Faster?..."), then immediately follow with the citation block.`
 
 /**
  * Generate a URL-friendly slug from a title
@@ -65,6 +79,89 @@ function generateSlug(title: string): string {
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '')
     .slice(0, 100)
+}
+
+/**
+ * Extract a meaningful excerpt from markdown content
+ * Pulls the first few paragraphs of actual content, skipping headers and formatting
+ */
+function extractExcerpt(markdown: string, maxLength: number = 500): string {
+  // Split into lines
+  const lines = markdown.split('\n')
+
+  const paragraphs: string[] = []
+  let currentParagraph = ''
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+
+    // Skip empty lines, headers, horizontal rules, and list markers at start
+    if (!trimmed) {
+      if (currentParagraph) {
+        paragraphs.push(currentParagraph)
+        currentParagraph = ''
+      }
+      continue
+    }
+
+    // Skip headers
+    if (trimmed.startsWith('#')) continue
+
+    // Skip horizontal rules
+    if (trimmed === '---' || trimmed === '***' || trimmed === '___') continue
+
+    // Skip blockquotes (usually the "bottom line" summary)
+    if (trimmed.startsWith('>')) continue
+
+    // Clean up the line - remove markdown formatting
+    let cleaned = trimmed
+      .replace(/\*\*([^*]+)\*\*/g, '$1') // Remove bold
+      .replace(/\*([^*]+)\*/g, '$1')     // Remove italic
+      .replace(/`([^`]+)`/g, '$1')       // Remove code
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Remove links, keep text
+
+    // Handle list items - convert to sentences
+    if (cleaned.startsWith('- ') || cleaned.startsWith('* ') || /^\d+\.\s/.test(cleaned)) {
+      cleaned = cleaned.replace(/^[-*]\s+/, '').replace(/^\d+\.\s+/, '')
+    }
+
+    currentParagraph += (currentParagraph ? ' ' : '') + cleaned
+  }
+
+  // Add last paragraph if exists
+  if (currentParagraph) {
+    paragraphs.push(currentParagraph)
+  }
+
+  // Join paragraphs until we reach max length
+  let excerpt = ''
+  for (const para of paragraphs) {
+    if (!para.trim()) continue
+
+    if (excerpt.length + para.length + 1 > maxLength) {
+      // If we have some content, stop here
+      if (excerpt.length > 100) break
+      // Otherwise, truncate this paragraph
+      const remaining = maxLength - excerpt.length - 1
+      excerpt += (excerpt ? ' ' : '') + para.slice(0, remaining).trim()
+      break
+    }
+    excerpt += (excerpt ? ' ' : '') + para
+  }
+
+  // Clean up and add ellipsis if truncated
+  excerpt = excerpt.trim()
+  if (excerpt.length >= maxLength - 10) {
+    // Find last sentence boundary
+    const lastPeriod = excerpt.lastIndexOf('. ')
+    if (lastPeriod > excerpt.length * 0.6) {
+      excerpt = excerpt.slice(0, lastPeriod + 1)
+    } else {
+      excerpt = excerpt.slice(0, maxLength - 3).trim() + '...'
+    }
+  }
+
+  return excerpt
 }
 
 /**
@@ -289,17 +386,21 @@ export async function GET(
 
       const markdownContent = assistantMessage.content[0].text.value
 
-      // Extract title from markdown
+      // Extract title from markdown (first # heading)
       const titleMatch = markdownContent.match(/^#\s+(.+)$/m)
       const blogTitle = titleMatch ? titleMatch[1].trim() : `Summary: ${paper.title}`
+
+      // Remove the title from content to avoid duplication
+      // The title is already stored in the title field
+      const contentWithoutTitle = markdownContent.replace(/^#\s+.+\n*/, '').trim()
 
       // Generate slug
       const baseSlug = generateSlug(blogTitle)
       const timestamp = Date.now()
       const slug = `${baseSlug}-${timestamp}`
 
-      // Convert to Lexical
-      const lexicalContent = markdownToLexical(markdownContent)
+      // Convert to Lexical (without the title)
+      const lexicalContent = markdownToLexical(contentWithoutTitle)
 
       // Get admin user for author
       const adminUsers = await payload.find({
@@ -316,6 +417,9 @@ export async function GET(
         }, { status: 500 })
       }
 
+      // Extract excerpt from the blog content (without title)
+      const excerpt = extractExcerpt(contentWithoutTitle)
+
       // Create blog post
       const blogPost = await payload.create({
         collection: 'blog-posts',
@@ -323,7 +427,7 @@ export async function GET(
           title: blogTitle,
           slug,
           content: lexicalContent,
-          excerpt: `AI-generated summary of the research paper: ${paper.title}`,
+          excerpt,
           publishedDate: new Date().toISOString(),
           author: authorId,
           sourcePaper: id,
