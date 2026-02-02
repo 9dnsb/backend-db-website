@@ -165,8 +165,151 @@ function extractExcerpt(markdown: string, maxLength: number = 500): string {
 }
 
 /**
+ * Async blog generation function - runs in the background
+ * This is fire-and-forget to avoid Vercel Hobby 10s timeout
+ */
+async function generateBlogAsync(
+  paperId: string,
+  paperTitle: string,
+  vectorStoreId: string
+): Promise<void> {
+  console.log(`[GENERATE-BLOG] Starting async blog generation for paper: ${paperId}`)
+  const startTime = Date.now()
+
+  try {
+    const payload = await getPayload({ config: configPromise })
+
+    // Generate blog using Responses API with GPT-5.2
+    const userMessage = `Please read and analyze the attached academic paper titled "${paperTitle}" using the file_search tool. Then write a blog post about it following the style guidelines in your instructions.
+
+Focus on:
+1. The main research question and why it matters
+2. The methodology and participants
+3. The key findings with specific numbers
+4. The practical implications for readers
+
+Remember to use the exact section structure and emoji headers specified in your instructions.`
+
+    console.log('[GENERATE-BLOG] Calling GPT-5.2 Responses API...')
+
+    const response = await openai.responses.create({
+      model: 'gpt-5.2',
+      instructions: BLOG_SYSTEM_PROMPT,
+      input: [{ role: 'user', content: userMessage }],
+      tools: [
+        {
+          type: 'file_search',
+          vector_store_ids: [vectorStoreId],
+        },
+      ],
+      // GPT-5.2 specific settings
+      reasoning: {
+        effort: 'low', // Some reasoning for better quality
+      },
+      text: {
+        verbosity: 'medium', // Balanced output
+      },
+      max_output_tokens: 4096,
+    })
+
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1)
+    console.log(`[GENERATE-BLOG] Response received in ${duration}s, status: ${response.status}`)
+
+    if (response.status !== 'completed') {
+      throw new Error(`Response failed: ${response.status} - ${JSON.stringify(response.error)}`)
+    }
+
+    // Extract the generated content
+    const markdownContent = response.output_text
+
+    if (!markdownContent) {
+      throw new Error('No text content in response')
+    }
+
+    console.log(`[GENERATE-BLOG] Content generated, length: ${markdownContent.length}`)
+
+    // Extract title from markdown
+    const titleMatch = markdownContent.match(/^#\s+(.+)$/m)
+    const blogTitle = titleMatch ? titleMatch[1].trim() : `Summary: ${paperTitle}`
+
+    // Remove the title from content to avoid duplication
+    const contentWithoutTitle = markdownContent.replace(/^#\s+.+\n*/, '').trim()
+
+    // Generate slug
+    const baseSlug = generateSlug(blogTitle)
+    const timestamp = Date.now()
+    const slug = `${baseSlug}-${timestamp}`
+
+    // Convert to Lexical
+    const lexicalContent = markdownToLexical(contentWithoutTitle)
+
+    // Get admin user for author
+    const adminUsers = await payload.find({
+      collection: 'users',
+      where: { role: { equals: 'admin' } },
+      limit: 1,
+    })
+    const authorId = adminUsers.docs[0]?.id
+
+    if (!authorId) {
+      throw new Error('No admin user found to set as author')
+    }
+
+    // Extract excerpt
+    const excerpt = extractExcerpt(contentWithoutTitle)
+
+    // Create blog post
+    const blogPost = await payload.create({
+      collection: 'blog-posts',
+      data: {
+        title: blogTitle,
+        slug,
+        content: lexicalContent,
+        excerpt,
+        publishedDate: new Date().toISOString(),
+        author: authorId,
+        sourcePaper: paperId,
+        status: 'draft',
+      },
+    })
+
+    // Update paper with success
+    await payload.update({
+      collection: 'papers',
+      id: paperId,
+      data: {
+        generatedBlogPost: blogPost.id,
+        blogGenerationStatus: 'completed',
+      },
+      context: { skipOpenAIUpload: true },
+    })
+
+    console.log(`[GENERATE-BLOG] Blog created successfully: ${blogPost.id} (${duration}s)`)
+  } catch (error) {
+    console.error('[GENERATE-BLOG] Async generation error:', error)
+
+    // Update paper with error status
+    try {
+      const payload = await getPayload({ config: configPromise })
+      await payload.update({
+        collection: 'papers',
+        id: paperId,
+        data: {
+          blogGenerationStatus: 'error',
+          blogGenerationError: error instanceof Error ? error.message : 'Unknown error',
+        },
+        context: { skipOpenAIUpload: true },
+      })
+    } catch (updateError) {
+      console.error('[GENERATE-BLOG] Failed to update error status:', updateError)
+    }
+  }
+}
+
+/**
  * POST /api/papers/[id]/generate-blog
- * Generates blog using GPT-5.2 Responses API (synchronous)
+ * Triggers blog generation using GPT-5.2 Responses API
+ * Returns immediately - generation runs in background to avoid Vercel timeout
  */
 export async function POST(
   request: Request,
@@ -210,6 +353,14 @@ export async function POST(
       )
     }
 
+    // Check if already generating
+    if (paper.blogGenerationStatus === 'generating') {
+      return Response.json(
+        { error: 'Blog generation already in progress' },
+        { status: 400 }
+      )
+    }
+
     // Update status to generating
     await payload.update({
       collection: 'papers',
@@ -221,171 +372,25 @@ export async function POST(
       context: { skipOpenAIUpload: true },
     })
 
-    // Generate blog using Responses API with GPT-5.2
-    const userMessage = `Please read and analyze the attached academic paper titled "${paper.title}" using the file_search tool. Then write a blog post about it following the style guidelines in your instructions.
-
-Focus on:
-1. The main research question and why it matters
-2. The methodology and participants
-3. The key findings with specific numbers
-4. The practical implications for readers
-
-Remember to use the exact section structure and emoji headers specified in your instructions.`
-
-    console.log('[GENERATE-BLOG] Starting GPT-5.2 Responses API call...')
-    const startTime = Date.now()
-
-    const response = await openai.responses.create({
-      model: 'gpt-5.2',
-      instructions: BLOG_SYSTEM_PROMPT,
-      input: [{ role: 'user', content: userMessage }],
-      tools: [
-        {
-          type: 'file_search',
-          vector_store_ids: [paper.vectorStoreId],
-        },
-      ],
-      // GPT-5.2 specific settings
-      reasoning: {
-        effort: 'low', // Some reasoning for better quality
-      },
-      text: {
-        verbosity: 'medium', // Balanced output
-      },
-      max_output_tokens: 4096,
+    // Fire-and-forget: start async generation without awaiting
+    // This allows the request to return before Vercel's 10s timeout
+    generateBlogAsync(id, paper.title, paper.vectorStoreId).catch((err) => {
+      console.error('[GENERATE-BLOG] Unhandled async error:', err)
     })
 
-    const duration = ((Date.now() - startTime) / 1000).toFixed(1)
-    console.log(`[GENERATE-BLOG] Response received in ${duration}s, status: ${response.status}`)
+    console.log(`[GENERATE-BLOG] Async generation started for paper: ${id}`)
 
-    if (response.status !== 'completed') {
-      await payload.update({
-        collection: 'papers',
-        id,
-        data: {
-          blogGenerationStatus: 'error',
-          blogGenerationError: `Response failed: ${response.status} - ${JSON.stringify(response.error)}`,
-        },
-        context: { skipOpenAIUpload: true },
-      })
-
-      return Response.json({
-        status: 'error',
-        error: response.error || `Response status: ${response.status}`,
-      }, { status: 500 })
-    }
-
-    // Extract the generated content
-    const markdownContent = response.output_text
-
-    if (!markdownContent) {
-      await payload.update({
-        collection: 'papers',
-        id,
-        data: {
-          blogGenerationStatus: 'error',
-          blogGenerationError: 'No text content in response',
-        },
-        context: { skipOpenAIUpload: true },
-      })
-
-      return Response.json({
-        status: 'error',
-        error: 'No text content in response',
-      }, { status: 500 })
-    }
-
-    // Extract title from markdown
-    const titleMatch = markdownContent.match(/^#\s+(.+)$/m)
-    const blogTitle = titleMatch ? titleMatch[1].trim() : `Summary: ${paper.title}`
-
-    // Remove the title from content to avoid duplication
-    const contentWithoutTitle = markdownContent.replace(/^#\s+.+\n*/, '').trim()
-
-    // Generate slug
-    const baseSlug = generateSlug(blogTitle)
-    const timestamp = Date.now()
-    const slug = `${baseSlug}-${timestamp}`
-
-    // Convert to Lexical
-    const lexicalContent = markdownToLexical(contentWithoutTitle)
-
-    // Get admin user for author
-    const adminUsers = await payload.find({
-      collection: 'users',
-      where: { role: { equals: 'admin' } },
-      limit: 1,
-    })
-    const authorId = adminUsers.docs[0]?.id
-
-    if (!authorId) {
-      return Response.json({
-        status: 'error',
-        error: 'No admin user found to set as author',
-      }, { status: 500 })
-    }
-
-    // Extract excerpt
-    const excerpt = extractExcerpt(contentWithoutTitle)
-
-    // Create blog post
-    const blogPost = await payload.create({
-      collection: 'blog-posts',
-      data: {
-        title: blogTitle,
-        slug,
-        content: lexicalContent,
-        excerpt,
-        publishedDate: new Date().toISOString(),
-        author: authorId,
-        sourcePaper: id,
-        status: 'draft',
-      },
-    })
-
-    // Update paper
-    await payload.update({
-      collection: 'papers',
-      id,
-      data: {
-        generatedBlogPost: blogPost.id,
-        blogGenerationStatus: 'completed',
-      },
-      context: { skipOpenAIUpload: true },
-    })
-
-    console.log(`[GENERATE-BLOG] Blog created successfully: ${blogPost.id}`)
-
+    // Return immediately with "started" status
     return Response.json({
-      status: 'completed',
-      blogPostId: blogPost.id,
-      blogTitle,
-      slug,
-      model: 'gpt-5.2',
-      api: 'Responses API',
-      duration: `${duration}s`,
+      status: 'started',
+      message: 'Blog generation has been started. Poll GET endpoint for status.',
+      paperId: id,
     })
   } catch (error) {
-    console.error('[GENERATE-BLOG] Error:', error)
-
-    // Try to update paper status
-    try {
-      const payload = await getPayload({ config: configPromise })
-      await payload.update({
-        collection: 'papers',
-        id,
-        data: {
-          blogGenerationStatus: 'error',
-          blogGenerationError: error instanceof Error ? error.message : 'Unknown error',
-        },
-        context: { skipOpenAIUpload: true },
-      })
-    } catch {
-      // Ignore update errors
-    }
+    console.error('[GENERATE-BLOG] Error starting generation:', error)
 
     return Response.json(
-      { error: error instanceof Error ? error.message : 'Failed to generate blog' },
+      { error: error instanceof Error ? error.message : 'Failed to start blog generation' },
       { status: 500 }
     )
   }
@@ -394,7 +399,7 @@ Remember to use the exact section structure and emoji headers specified in your 
 /**
  * GET /api/papers/[id]/generate-blog
  * Returns current blog generation status
- * Note: With Responses API, generation is synchronous so this just returns status
+ * Poll this endpoint to check if async generation has completed
  */
 export async function GET(
   request: Request,
@@ -431,7 +436,7 @@ export async function GET(
     if (paper.blogGenerationStatus === 'generating') {
       return Response.json({
         status: 'in_progress',
-        message: 'Blog generation is in progress. With Responses API, this should complete quickly.',
+        message: 'Blog generation is in progress. This typically takes 20-40 seconds.',
       })
     }
 
