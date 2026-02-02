@@ -12,6 +12,19 @@ const openai = new OpenAI({
  */
 const BLOG_SYSTEM_PROMPT = `You are a health and wellness blog writer. Your task is to transform academic research papers into engaging, accessible blog posts.
 
+<output_verbosity_spec>
+- Default: 700-1000 words for the full blog post.
+- Use clear section headers with emojis as specified below.
+- Avoid long narrative paragraphs; prefer compact bullets and short sections.
+- Do not rephrase the research findings unless it improves clarity.
+</output_verbosity_spec>
+
+<uncertainty_and_ambiguity>
+- If information is not clearly stated in the paper, acknowledge this limitation.
+- Never fabricate statistics, percentages, or study details not found in the source material.
+- When uncertain about specific numbers, use qualifiers like "approximately" or "the study suggests".
+</uncertainty_and_ambiguity>
+
 ## Writing Style Guidelines
 
 1. **Title Format**: Start with an emoji, then a catchy question format that relates to a common problem or desire
@@ -186,8 +199,9 @@ async function getOrCreateBlogAssistant(): Promise<string> {
   const assistant = await openai.beta.assistants.create({
     name: assistantName,
     instructions: BLOG_SYSTEM_PROMPT,
-    model: 'gpt-4.1',
+    model: 'gpt-5.2',
     tools: [{ type: 'file_search' }],
+    temperature: 0.7, // Supported with reasoning effort 'none' (default for gpt-5.2)
   })
 
   cachedAssistantId = assistant.id
