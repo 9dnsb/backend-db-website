@@ -8,26 +8,46 @@ const openai = new OpenAI({
 })
 
 /**
- * System prompt for blog generation
+ * System prompt for blog generation - GPT-5.2 optimized
  */
 const BLOG_SYSTEM_PROMPT = `You are a health and wellness blog writer. Your task is to transform academic research papers into engaging, accessible blog posts.
 
-<output_verbosity_spec>
-- Default: 700-1000 words for the full blog post.
-- Use clear section headers with emojis as specified below.
-- Avoid long narrative paragraphs; prefer compact bullets and short sections.
-- Do not rephrase the research findings unless it improves clarity.
-</output_verbosity_spec>
+## CRITICAL FORMATTING RULES (MUST FOLLOW)
 
-<uncertainty_and_ambiguity>
-- If information is not clearly stated in the paper, acknowledge this limitation.
-- Never fabricate statistics, percentages, or study details not found in the source material.
-- When uncertain about specific numbers, use qualifiers like "approximately" or "the study suggests".
-</uncertainty_and_ambiguity>
+### Section Headers — ALWAYS include descriptive subtitles
+Every section header MUST have a colon followed by a brief, engaging subtitle. Never use generic headers.
+
+❌ WRONG: "## 🔬 The Problem"
+✅ RIGHT: "## 🔬 The Problem: Parents Are Confused About Starting Solids"
+
+❌ WRONG: "## 📈 The Results"
+✅ RIGHT: "## 📈 The Results: Both Methods Are Equally Safe"
+
+### Results Section — MANDATORY FORMAT
+You MUST format every finding in the Results section exactly like this:
+
+✅ **[Conclusion in plain English]** — [supporting numbers without statistical notation]
+
+⚖️ **[Conclusion in plain English]** — [supporting numbers without statistical notation]
+
+❌ **[Conclusion in plain English]** — [supporting numbers without statistical notation]
+
+EVERY finding MUST start with ✅, ⚖️, or ❌:
+- ✅ for positive/beneficial findings
+- ⚖️ for neutral/no-difference findings
+- ❌ for negative findings or risks
+
+NEVER use these in Results:
+- Statistical notation: ±, P < .001, P > .05
+- Units inline: g/dL, mg/day, kg
+- Study author names: "(Smith et al.)"
+- Dense paragraphs — use one finding per line
+
+---
 
 ## Writing Style Guidelines
 
-1. **Title Format**: Start with an emoji, then a catchy question format that relates to a common problem or desire
+1. **Title Format**: Start with an emoji, then a catchy question format
    - Example: "🏃 Want to Run Faster? Try This Surprising Pre-Workout Snack"
    - Example: "💪 Struggling with Muscle Soreness? Science Has a Sweet Solution"
 
@@ -36,50 +56,34 @@ const BLOG_SYSTEM_PROMPT = `You are a health and wellness blog writer. Your task
    a) **Citation Block** (REQUIRED - comes right after the title):
       Start with "Based on the [YEAR] study" followed by the paper title in quotes, authors (use "& others" if more than 3), journal name in italics, and DOI link if available.
 
-      Example format:
-      Based on the 2024 study
-      "Effects of a monthly unconditional cash transfer starting at birth on family investments among US families with low income"
-      by Troller-Renfree, Costanzo, Duncan & others
-      Published in *Nature Human Behaviour*
-      DOI: 10.1038/s41562-024-01915-7
-
    b) **Hook paragraph**: 1-2 engaging sentences that capture why this matters
 
-   c) **Section headers with emojis**:
-      - ## 🔬 The Problem (or The Question)
-      - ## 📊 The Study
-      - ## 📈 The Results
-      - ## 🧠 How It Works (or Why This Works)
-      - ## 🎯 What This Means for You
+   c) **Section headers with emojis and subtitles**:
+      - ## 🔬 The Problem: [Subtitle]
+      - ## 📊 The Study: [Subtitle]
+      - ## 📈 The Results: [Subtitle]
+      - ## 🧠 How It Works: [Subtitle]
+      - ## 🎯 What This Means for You: [Subtitle]
       - ## ⚠️ Caveats
       - ## 💡 The Bottom Line
 
-3. **Tone**:
-   - Conversational and accessible - write like you're explaining to a friend
-   - Use "you" to address the reader directly
-   - Avoid jargon - explain technical terms simply
-   - Be enthusiastic but not over-the-top
+3. **Tone**: Conversational, accessible, use "you" directly, avoid jargon
 
 4. **Formatting**:
-   - Use **bold** for key statistics and important findings
-   - Use horizontal rules (---) between major sections
+   - Use **bold** for key findings
+   - Use horizontal rules (---) between sections
    - Keep paragraphs short (2-4 sentences)
-   - Include specific numbers from the study
 
-5. **Content Guidelines**:
-   - The Problem: Set up why this research matters. What's the everyday struggle?
-   - The Study: Methodology details - participants, duration, what they did
-   - The Results: Specific findings with numbers. What percentage improved? By how much?
-   - How It Works: The mechanism - why does this intervention work?
-   - What This Means for You: Practical, actionable takeaways
-   - Caveats: Study limitations honestly stated
-   - The Bottom Line: A memorable closing blockquote (use > for blockquote)
+5. **Length**: 700-1000 words total
 
-6. **Length**: Aim for 700-1000 words total.
+<uncertainty_and_ambiguity>
+- If information is not clearly stated in the paper, acknowledge this limitation.
+- Never fabricate statistics, percentages, or study details not found in the source material.
+- When uncertain about specific numbers, use qualifiers like "approximately" or "the study suggests".
+</uncertainty_and_ambiguity>
 
 ## Output Format
-Return ONLY the markdown content of the blog post. Do not include any preamble or explanation.
-Start directly with the emoji title (e.g., "# 🏃 Want to Run Faster?..."), then immediately follow with the citation block.`
+Return ONLY the markdown content. Start directly with the emoji title (e.g., "# 🏃 Want to Run Faster?..."), then immediately follow with the citation block.`
 
 /**
  * Generate a URL-friendly slug from a title
@@ -96,19 +100,15 @@ function generateSlug(title: string): string {
 
 /**
  * Extract a meaningful excerpt from markdown content
- * Pulls the first few paragraphs of actual content, skipping headers and formatting
  */
 function extractExcerpt(markdown: string, maxLength: number = 500): string {
-  // Split into lines
   const lines = markdown.split('\n')
-
   const paragraphs: string[] = []
   let currentParagraph = ''
 
   for (const line of lines) {
     const trimmed = line.trim()
 
-    // Skip empty lines, headers, horizontal rules, and list markers at start
     if (!trimmed) {
       if (currentParagraph) {
         paragraphs.push(currentParagraph)
@@ -117,23 +117,16 @@ function extractExcerpt(markdown: string, maxLength: number = 500): string {
       continue
     }
 
-    // Skip headers
     if (trimmed.startsWith('#')) continue
-
-    // Skip horizontal rules
     if (trimmed === '---' || trimmed === '***' || trimmed === '___') continue
-
-    // Skip blockquotes (usually the "bottom line" summary)
     if (trimmed.startsWith('>')) continue
 
-    // Clean up the line - remove markdown formatting
     let cleaned = trimmed
-      .replace(/\*\*([^*]+)\*\*/g, '$1') // Remove bold
-      .replace(/\*([^*]+)\*/g, '$1')     // Remove italic
-      .replace(/`([^`]+)`/g, '$1')       // Remove code
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Remove links, keep text
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/\*([^*]+)\*/g, '$1')
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
 
-    // Handle list items - convert to sentences
     if (cleaned.startsWith('- ') || cleaned.startsWith('* ') || /^\d+\.\s/.test(cleaned)) {
       cleaned = cleaned.replace(/^[-*]\s+/, '').replace(/^\d+\.\s+/, '')
     }
@@ -141,20 +134,16 @@ function extractExcerpt(markdown: string, maxLength: number = 500): string {
     currentParagraph += (currentParagraph ? ' ' : '') + cleaned
   }
 
-  // Add last paragraph if exists
   if (currentParagraph) {
     paragraphs.push(currentParagraph)
   }
 
-  // Join paragraphs until we reach max length
   let excerpt = ''
   for (const para of paragraphs) {
     if (!para.trim()) continue
 
     if (excerpt.length + para.length + 1 > maxLength) {
-      // If we have some content, stop here
       if (excerpt.length > 100) break
-      // Otherwise, truncate this paragraph
       const remaining = maxLength - excerpt.length - 1
       excerpt += (excerpt ? ' ' : '') + para.slice(0, remaining).trim()
       break
@@ -162,10 +151,8 @@ function extractExcerpt(markdown: string, maxLength: number = 500): string {
     excerpt += (excerpt ? ' ' : '') + para
   }
 
-  // Clean up and add ellipsis if truncated
   excerpt = excerpt.trim()
   if (excerpt.length >= maxLength - 10) {
-    // Find last sentence boundary
     const lastPeriod = excerpt.lastIndexOf('. ')
     if (lastPeriod > excerpt.length * 0.6) {
       excerpt = excerpt.slice(0, lastPeriod + 1)
@@ -178,39 +165,8 @@ function extractExcerpt(markdown: string, maxLength: number = 500): string {
 }
 
 /**
- * Get or create the blog generation assistant
- */
-let cachedAssistantId: string | null = null
-
-async function getOrCreateBlogAssistant(): Promise<string> {
-  if (cachedAssistantId) {
-    return cachedAssistantId
-  }
-
-  const assistantName = 'Blog Post Generator'
-  const assistants = await openai.beta.assistants.list({ limit: 100 })
-  const existing = assistants.data.find((a) => a.name === assistantName)
-
-  if (existing) {
-    cachedAssistantId = existing.id
-    return existing.id
-  }
-
-  const assistant = await openai.beta.assistants.create({
-    name: assistantName,
-    instructions: BLOG_SYSTEM_PROMPT,
-    model: 'gpt-5.2',
-    tools: [{ type: 'file_search' }],
-    temperature: 0.7, // Supported with reasoning effort 'none' (default for gpt-5.2)
-  })
-
-  cachedAssistantId = assistant.id
-  return assistant.id
-}
-
-/**
  * POST /api/papers/[id]/generate-blog
- * Starts blog generation - creates thread and run, returns immediately
+ * Generates blog using GPT-5.2 Responses API (synchronous)
  */
 export async function POST(
   request: Request,
@@ -246,14 +202,7 @@ export async function POST(
       )
     }
 
-    // Check if already generating or completed
-    if (paper.blogGenerationStatus === 'generating' && paper.blogRunId) {
-      return Response.json(
-        { error: 'Blog generation already in progress', runId: paper.blogRunId },
-        { status: 400 }
-      )
-    }
-
+    // Check if already completed
     if (paper.blogGenerationStatus === 'completed' && paper.generatedBlogPost) {
       return Response.json(
         { error: 'Blog already generated', blogPostId: paper.generatedBlogPost },
@@ -261,17 +210,19 @@ export async function POST(
       )
     }
 
-    // Create thread with vector store
-    const thread = await openai.beta.threads.create({
-      tool_resources: {
-        file_search: {
-          vector_store_ids: [paper.vectorStoreId],
-        },
+    // Update status to generating
+    await payload.update({
+      collection: 'papers',
+      id,
+      data: {
+        blogGenerationStatus: 'generating',
+        blogGenerationError: null,
       },
+      context: { skipOpenAIUpload: true },
     })
 
-    // Add user message
-    const userMessageContent = `Please read and analyze the attached academic paper titled "${paper.title}" using the file_search tool. Then write a blog post about it following the style guidelines in your instructions.
+    // Generate blog using Responses API with GPT-5.2
+    const userMessage = `Please read and analyze the attached academic paper titled "${paper.title}" using the file_search tool. Then write a blog post about it following the style guidelines in your instructions.
 
 Focus on:
 1. The main research question and why it matters
@@ -281,43 +232,160 @@ Focus on:
 
 Remember to use the exact section structure and emoji headers specified in your instructions.`
 
-    await openai.beta.threads.messages.create(thread.id, {
-      role: 'user',
-      content: userMessageContent,
+    console.log('[GENERATE-BLOG] Starting GPT-5.2 Responses API call...')
+    const startTime = Date.now()
+
+    const response = await openai.responses.create({
+      model: 'gpt-5.2',
+      instructions: BLOG_SYSTEM_PROMPT,
+      input: [{ role: 'user', content: userMessage }],
+      tools: [
+        {
+          type: 'file_search',
+          vector_store_ids: [paper.vectorStoreId],
+        },
+      ],
+      // GPT-5.2 specific settings
+      reasoning: {
+        effort: 'low', // Some reasoning for better quality
+      },
+      text: {
+        verbosity: 'medium', // Balanced output
+      },
+      max_output_tokens: 4096,
     })
 
-    // Get assistant
-    const assistantId = await getOrCreateBlogAssistant()
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1)
+    console.log(`[GENERATE-BLOG] Response received in ${duration}s, status: ${response.status}`)
 
-    // Start run (don't poll - just create and return)
-    const run = await openai.beta.threads.runs.create(thread.id, {
-      assistant_id: assistantId,
-      tool_choice: { type: 'file_search' },
+    if (response.status !== 'completed') {
+      await payload.update({
+        collection: 'papers',
+        id,
+        data: {
+          blogGenerationStatus: 'error',
+          blogGenerationError: `Response failed: ${response.status} - ${JSON.stringify(response.error)}`,
+        },
+        context: { skipOpenAIUpload: true },
+      })
+
+      return Response.json({
+        status: 'error',
+        error: response.error || `Response status: ${response.status}`,
+      }, { status: 500 })
+    }
+
+    // Extract the generated content
+    const markdownContent = response.output_text
+
+    if (!markdownContent) {
+      await payload.update({
+        collection: 'papers',
+        id,
+        data: {
+          blogGenerationStatus: 'error',
+          blogGenerationError: 'No text content in response',
+        },
+        context: { skipOpenAIUpload: true },
+      })
+
+      return Response.json({
+        status: 'error',
+        error: 'No text content in response',
+      }, { status: 500 })
+    }
+
+    // Extract title from markdown
+    const titleMatch = markdownContent.match(/^#\s+(.+)$/m)
+    const blogTitle = titleMatch ? titleMatch[1].trim() : `Summary: ${paper.title}`
+
+    // Remove the title from content to avoid duplication
+    const contentWithoutTitle = markdownContent.replace(/^#\s+.+\n*/, '').trim()
+
+    // Generate slug
+    const baseSlug = generateSlug(blogTitle)
+    const timestamp = Date.now()
+    const slug = `${baseSlug}-${timestamp}`
+
+    // Convert to Lexical
+    const lexicalContent = markdownToLexical(contentWithoutTitle)
+
+    // Get admin user for author
+    const adminUsers = await payload.find({
+      collection: 'users',
+      where: { role: { equals: 'admin' } },
+      limit: 1,
+    })
+    const authorId = adminUsers.docs[0]?.id
+
+    if (!authorId) {
+      return Response.json({
+        status: 'error',
+        error: 'No admin user found to set as author',
+      }, { status: 500 })
+    }
+
+    // Extract excerpt
+    const excerpt = extractExcerpt(contentWithoutTitle)
+
+    // Create blog post
+    const blogPost = await payload.create({
+      collection: 'blog-posts',
+      data: {
+        title: blogTitle,
+        slug,
+        content: lexicalContent,
+        excerpt,
+        publishedDate: new Date().toISOString(),
+        author: authorId,
+        sourcePaper: id,
+        status: 'draft',
+      },
     })
 
-    // Update paper with thread and run IDs
+    // Update paper
     await payload.update({
       collection: 'papers',
       id,
       data: {
-        blogGenerationStatus: 'generating',
-        blogThreadId: thread.id,
-        blogRunId: run.id,
-        blogGenerationError: null,
+        generatedBlogPost: blogPost.id,
+        blogGenerationStatus: 'completed',
       },
       context: { skipOpenAIUpload: true },
     })
 
+    console.log(`[GENERATE-BLOG] Blog created successfully: ${blogPost.id}`)
+
     return Response.json({
-      success: true,
-      message: 'Blog generation started',
-      threadId: thread.id,
-      runId: run.id,
+      status: 'completed',
+      blogPostId: blogPost.id,
+      blogTitle,
+      slug,
+      model: 'gpt-5.2',
+      api: 'Responses API',
+      duration: `${duration}s`,
     })
   } catch (error) {
-    console.error('[GENERATE-BLOG] Error starting generation:', error)
+    console.error('[GENERATE-BLOG] Error:', error)
+
+    // Try to update paper status
+    try {
+      const payload = await getPayload({ config: configPromise })
+      await payload.update({
+        collection: 'papers',
+        id,
+        data: {
+          blogGenerationStatus: 'error',
+          blogGenerationError: error instanceof Error ? error.message : 'Unknown error',
+        },
+        context: { skipOpenAIUpload: true },
+      })
+    } catch {
+      // Ignore update errors
+    }
+
     return Response.json(
-      { error: error instanceof Error ? error.message : 'Failed to start generation' },
+      { error: error instanceof Error ? error.message : 'Failed to generate blog' },
       { status: 500 }
     )
   }
@@ -325,7 +393,8 @@ Remember to use the exact section structure and emoji headers specified in your 
 
 /**
  * GET /api/papers/[id]/generate-blog
- * Checks run status and saves blog if complete
+ * Returns current blog generation status
+ * Note: With Responses API, generation is synchronous so this just returns status
  */
 export async function GET(
   request: Request,
@@ -336,7 +405,6 @@ export async function GET(
   try {
     const payload = await getPayload({ config: configPromise })
 
-    // Get the paper
     const paper = await payload.findByID({
       collection: 'papers',
       id,
@@ -346,141 +414,30 @@ export async function GET(
       return Response.json({ error: 'Paper not found' }, { status: 404 })
     }
 
-    const threadId = paper.blogThreadId
-    const runId = paper.blogRunId
-
-    if (!threadId || !runId) {
-      return Response.json(
-        { error: 'No active blog generation. Call POST first to start.' },
-        { status: 400 }
-      )
-    }
-
-    // Check run status
-    const run = await openai.beta.threads.runs.retrieve(runId, { thread_id: threadId })
-
-    if (run.status === 'queued' || run.status === 'in_progress') {
-      return Response.json({
-        status: 'in_progress',
-        runStatus: run.status,
-        message: 'Blog generation is still running. Check again in a few seconds.',
-      })
-    }
-
-    if (run.status === 'failed' || run.status === 'cancelled' || run.status === 'expired') {
-      // Update paper with error
-      await payload.update({
-        collection: 'papers',
-        id,
-        data: {
-          blogGenerationStatus: 'error',
-          blogGenerationError: `Run ${run.status}: ${JSON.stringify(run.last_error)}`,
-        },
-        context: { skipOpenAIUpload: true },
-      })
-
-      return Response.json({
-        status: 'error',
-        runStatus: run.status,
-        error: run.last_error,
-      })
-    }
-
-    if (run.status === 'completed') {
-      // Get the generated content
-      const messages = await openai.beta.threads.messages.list(threadId)
-      const assistantMessage = messages.data.find((m) => m.role === 'assistant')
-
-      if (!assistantMessage || assistantMessage.content[0].type !== 'text') {
-        return Response.json({
-          status: 'error',
-          error: 'No text response from assistant',
-        }, { status: 500 })
-      }
-
-      const markdownContent = assistantMessage.content[0].text.value
-
-      // Extract title from markdown (first # heading)
-      const titleMatch = markdownContent.match(/^#\s+(.+)$/m)
-      const blogTitle = titleMatch ? titleMatch[1].trim() : `Summary: ${paper.title}`
-
-      // Remove the title from content to avoid duplication
-      // The title is already stored in the title field
-      const contentWithoutTitle = markdownContent.replace(/^#\s+.+\n*/, '').trim()
-
-      // Generate slug
-      const baseSlug = generateSlug(blogTitle)
-      const timestamp = Date.now()
-      const slug = `${baseSlug}-${timestamp}`
-
-      // Convert to Lexical (without the title)
-      const lexicalContent = markdownToLexical(contentWithoutTitle)
-
-      // Get admin user for author
-      const adminUsers = await payload.find({
-        collection: 'users',
-        where: { role: { equals: 'admin' } },
-        limit: 1,
-      })
-      const authorId = adminUsers.docs[0]?.id
-
-      if (!authorId) {
-        return Response.json({
-          status: 'error',
-          error: 'No admin user found to set as author',
-        }, { status: 500 })
-      }
-
-      // Extract excerpt from the blog content (without title)
-      const excerpt = extractExcerpt(contentWithoutTitle)
-
-      // Create blog post
-      const blogPost = await payload.create({
-        collection: 'blog-posts',
-        data: {
-          title: blogTitle,
-          slug,
-          content: lexicalContent,
-          excerpt,
-          publishedDate: new Date().toISOString(),
-          author: authorId,
-          sourcePaper: id,
-          status: 'draft',
-        },
-      })
-
-      // Update paper
-      await payload.update({
-        collection: 'papers',
-        id,
-        data: {
-          generatedBlogPost: blogPost.id,
-          blogGenerationStatus: 'completed',
-          blogThreadId: null,
-          blogRunId: null,
-        },
-        context: { skipOpenAIUpload: true },
-      })
-
-      // Clean up thread
-      try {
-        await openai.beta.threads.delete(threadId)
-      } catch {
-        // Ignore cleanup errors
-      }
-
+    if (paper.blogGenerationStatus === 'completed' && paper.generatedBlogPost) {
       return Response.json({
         status: 'completed',
-        blogPostId: blogPost.id,
-        blogTitle,
-        slug,
+        blogPostId: paper.generatedBlogPost,
       })
     }
 
-    // Unknown status
+    if (paper.blogGenerationStatus === 'error') {
+      return Response.json({
+        status: 'error',
+        error: paper.blogGenerationError || 'Unknown error',
+      })
+    }
+
+    if (paper.blogGenerationStatus === 'generating') {
+      return Response.json({
+        status: 'in_progress',
+        message: 'Blog generation is in progress. With Responses API, this should complete quickly.',
+      })
+    }
+
     return Response.json({
-      status: 'unknown',
-      runStatus: run.status,
+      status: 'not_started',
+      message: 'Blog generation has not been started. Call POST to generate.',
     })
   } catch (error) {
     console.error('[GENERATE-BLOG] Error checking status:', error)

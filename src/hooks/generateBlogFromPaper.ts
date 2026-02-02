@@ -46,15 +46,75 @@ function generateSlug(title: string): string {
 
 /**
  * System prompt for blog generation - defines the writing style
+ * Using GPT-5.2 best practices with verbosity and uncertainty handling
  */
 const BLOG_SYSTEM_PROMPT = `You are a health and wellness blog writer. Your task is to transform academic research papers into engaging, accessible blog posts.
 
-<output_verbosity_spec>
-- Default: 600-900 words for the full blog post.
-- Use clear section headers with emojis as specified below.
-- Avoid long narrative paragraphs; prefer compact bullets and short sections.
-- Do not rephrase the research findings unless it improves clarity.
-</output_verbosity_spec>
+## CRITICAL FORMATTING RULES (MUST FOLLOW)
+
+### Section Headers — ALWAYS include descriptive subtitles
+Every section header MUST have a colon followed by a brief, engaging subtitle. Never use generic headers.
+
+❌ WRONG: "## 🔬 The Problem"
+✅ RIGHT: "## 🔬 The Problem: Parents Are Confused About Starting Solids"
+
+❌ WRONG: "## 📈 The Results"
+✅ RIGHT: "## 📈 The Results: Both Methods Are Equally Safe"
+
+### Results Section — MANDATORY FORMAT
+You MUST format every finding in the Results section exactly like this:
+
+✅ **[Conclusion in plain English]** — [supporting numbers without statistical notation]
+
+⚖️ **[Conclusion in plain English]** — [supporting numbers without statistical notation]
+
+❌ **[Conclusion in plain English]** — [supporting numbers without statistical notation]
+
+EVERY finding MUST start with ✅, ⚖️, or ❌:
+- ✅ for positive/beneficial findings
+- ⚖️ for neutral/no-difference findings
+- ❌ for negative findings or risks
+
+NEVER use these in Results:
+- Statistical notation: ±, P < .001, P > .05
+- Units inline: g/dL, mg/day, kg
+- Study author names: "(Smith et al.)"
+- Dense paragraphs — use one finding per line
+
+Example Results section:
+## 📈 The Results: No Major Safety Differences
+
+✅ **No increased choking risk** — 2 out of 142 BLW babies choked vs 3 out of 138 spoon-fed babies
+
+⚖️ **Mixed findings on weight** — one study found 0% of BLW babies overweight vs 17% spoon-fed; another study found no difference
+
+✅ **Iron levels were identical** — both groups had similar hemoglobin levels around 12 grams per deciliter
+
+---
+
+## Writing Style Guidelines
+
+1. **Title Format**: Start with an emoji, then a catchy question format
+   - Example: "🏃 Want to Run Faster? Try This Surprising Pre-Workout Snack"
+   - Example: "💪 Struggling with Muscle Soreness? Science Has a Sweet Solution"
+
+2. **Required Sections** (all must have descriptive subtitles):
+   - ## 🚨/🔬/❓ The Problem/Question: [Subtitle]
+   - ## 🧪/📊 The Study: [Subtitle]
+   - ## 📊/📈 The Results: [Subtitle]
+   - ## 🧠 Why It Works: [Subtitle]
+   - ## 🎯/👶/🏃 What This Means for You/Parents/etc: [Subtitle]
+   - ## ⚠️ Caveats/Limitations
+   - ## ✅/💡 Bottom Line
+
+3. **Tone**: Conversational, accessible, use "you" directly, avoid jargon
+
+4. **Formatting**:
+   - Use **bold** for key findings
+   - Use horizontal rules (---) between sections
+   - Keep paragraphs short (2-4 sentences)
+
+5. **Length**: 600-900 words total
 
 <uncertainty_and_ambiguity>
 - If information is not clearly stated in the paper, acknowledge this limitation.
@@ -62,75 +122,11 @@ const BLOG_SYSTEM_PROMPT = `You are a health and wellness blog writer. Your task
 - When uncertain about specific numbers, use qualifiers like "approximately" or "the study suggests".
 </uncertainty_and_ambiguity>
 
-## Writing Style Guidelines
-
-1. **Title Format**: Start with an emoji, then a catchy question format that relates to a common problem or desire
-   - Example: "🏃 Want to Run Faster? Try This Surprising Pre-Workout Snack"
-   - Example: "💪 Struggling with Muscle Soreness? Science Has a Sweet Solution"
-
-2. **Structure**: Use these section headers with emojis AND descriptive subtitles:
-   - Every header MUST have a colon followed by a brief, engaging subtitle specific to the article
-   - The subtitle should hint at the key point of that section
-   - Examples:
-     * ## 🚨 The Problem: Peanut Allergies Keep Rising
-     * ## 🧪 The Study: Avoid Peanuts or Eat Them Early?
-     * ## 📊 The Results: Huge Drop in Peanut Allergies
-     * ## 🧠 Why It Works: Teaching the Body Tolerance
-     * ## 👶 What This Means for Parents
-     * ## ⚠️ A Few Caveats
-     * ## ✅ Bottom Line
-   - Required sections (choose appropriate emoji for the topic):
-     * The Problem/The Question — use 🚨, 🔬, or ❓
-     * The Study — use 🧪 or 📊
-     * The Results — use 📊 or 📈
-     * Why It Works/Why This Works — use 🧠
-     * What This Means for You/Parents/Runners/etc. — use 🎯, 👶, 🏃, or topic-appropriate emoji
-     * Caveats/Limitations — use ⚠️
-     * Bottom Line — use ✅ or 💡
-
-3. **Tone**:
-   - Conversational and accessible - write like you're explaining to a friend
-   - Use "you" to address the reader directly
-   - Avoid jargon - explain technical terms simply
-   - Be enthusiastic but not over-the-top
-
-4. **Formatting**:
-   - Use **bold** for key statistics and important findings
-   - Use horizontal rules (---) between major sections
-   - Keep paragraphs short (2-4 sentences)
-   - Include specific numbers from the study
-
-5. **Content Guidelines**:
-   - The Problem: Set up why this research matters. What's the everyday struggle?
-   - The Study: Methodology details - participants, duration, what they did
-   - The Results: Follow these formatting rules carefully:
-     * **Lead with the conclusion**, not the study name or author
-     * Use emoji markers for visual scanning:
-       - ✅ for positive/beneficial findings
-       - ❌ for negative findings or risks
-       - ⚖️ for neutral/no-difference findings
-     * **One finding per line** — keep it scannable, no dense paragraphs
-     * **Plain English first**, then supporting numbers
-       - Good: "✅ **No increased choking risk** — only 2 out of 142 BLW babies choked vs 3 out of 138 TSF babies"
-       - Bad: "In one trial (Smith et al.), 2 out of 142 BLW babies choked vs 3 out of 138 TSF babies (P > .20)"
-     * Move study citations and P-values to the end of the bullet or omit them entirely
-     * Avoid inline statistical notation (±, P < .001, g/dL) — translate to plain language
-     * When comparing groups, make the contrast immediately clear:
-       - Good: "14 out of 100 who avoided peanuts developed an allergy vs only 2 out of 100 who ate peanuts"
-       - Bad: "The avoidance group had 13.7% incidence compared to 1.9% in the consumption group (P < .001)"
-   - How It Works: The mechanism - why does this intervention work?
-   - What This Means for You: Practical, actionable takeaways
-   - Caveats: Study limitations honestly stated
-   - The Bottom Line: A memorable closing blockquote (use > for blockquote)
-
-6. **Length**: Aim for 600-900 words total.
-
 ## Output Format
-Return ONLY the markdown content of the blog post. Do not include any preamble or explanation.
-Start directly with the emoji title (e.g., "# 🏃 Want to Run Faster?...")`
+Return ONLY the markdown content. Start directly with the emoji title (e.g., "# 🏃 Want to Run Faster?...")`
 
 /**
- * Generate a blog post from a paper using OpenAI
+ * Generate a blog post from a paper using OpenAI Responses API (GPT-5.2)
  */
 export async function generateBlogFromPaper(
   paperId: string,
@@ -138,31 +134,31 @@ export async function generateBlogFromPaper(
   vectorStoreId: string
 ): Promise<void> {
   console.log('\n' + '='.repeat(60))
-  log('🚀 STARTING BLOG GENERATION')
+  log('🚀 STARTING BLOG GENERATION (Responses API + GPT-5.2)')
   log('Input parameters', { paperId, paperTitle, vectorStoreId })
   console.log('='.repeat(60))
 
   const payload = await getPayload({ config })
-  log('Step 1/8: Payload instance acquired')
+  log('Step 1/6: Payload instance acquired')
 
   try {
     // Update status to generating
-    log('Step 2/8: Updating paper status to "generating"')
+    log('Step 2/6: Updating paper status to "generating"')
     await payload.update({
       collection: 'papers',
       id: paperId,
       data: { blogGenerationStatus: 'generating' },
       context: { skipOpenAIUpload: true },
     })
-    log('Step 2/8: ✓ Paper status updated')
+    log('Step 2/6: ✓ Paper status updated')
 
     // Check if paper already has a generated blog post
-    log('Step 3/8: Checking for existing blog post')
+    log('Step 3/6: Checking for existing blog post')
     const paper = await payload.findByID({
       collection: 'papers',
       id: paperId,
     })
-    log('Step 3/8: Paper fetched', {
+    log('Step 3/6: Paper fetched', {
       hasExistingBlogPost: !!paper.generatedBlogPost,
       existingBlogPostId: paper.generatedBlogPost || null,
     })
@@ -179,21 +175,9 @@ export async function generateBlogFromPaper(
       return
     }
 
-    // Create a thread with the vector store attached
-    log('Step 4/8: Creating OpenAI thread with vector store')
-    log('Step 4/8: Vector store ID being used', { vectorStoreId })
-    const thread = await openai.beta.threads.create({
-      tool_resources: {
-        file_search: {
-          vector_store_ids: [vectorStoreId],
-        },
-      },
-    })
-    log('Step 4/8: ✓ Thread created', { threadId: thread.id })
-
-    // Add the user message requesting blog generation
-    log('Step 5/8: Adding user message to thread')
-    const userMessageContent = `Please read and analyze the attached academic paper titled "${paperTitle}" using the file_search tool. Then write a blog post about it following the style guidelines in your instructions.
+    // Generate blog using Responses API with file_search tool
+    log('Step 4/6: Calling OpenAI Responses API with GPT-5.2')
+    const userMessage = `Please read and analyze the attached academic paper titled "${paperTitle}" using the file_search tool. Then write a blog post about it following the style guidelines in your instructions.
 
 Focus on:
 1. The main research question and why it matters
@@ -203,81 +187,64 @@ Focus on:
 
 Remember to use the exact section structure and emoji headers specified in your instructions.`
 
-    await openai.beta.threads.messages.create(thread.id, {
-      role: 'user',
-      content: userMessageContent,
-    })
-    log('Step 5/8: ✓ User message added', { messageLength: userMessageContent.length })
+    log('Step 4/6: User message prepared', { messageLength: userMessage.length })
 
-    // Get or create assistant
-    log('Step 6/8: Getting/creating blog assistant')
-    const assistantId = await getOrCreateBlogAssistant()
-    log('Step 6/8: ✓ Assistant ready', { assistantId })
-
-    // Run the assistant
-    log('Step 6/8: Running assistant (this may take 30-60 seconds)...')
     const runStartTime = Date.now()
-    const run = await openai.beta.threads.runs.createAndPoll(thread.id, {
-      assistant_id: assistantId,
-      tool_choice: { type: 'file_search' },
+    const response = await openai.responses.create({
+      model: 'gpt-5.2',
+      instructions: BLOG_SYSTEM_PROMPT,
+      input: [{ role: 'user', content: userMessage }],
+      tools: [
+        {
+          type: 'file_search',
+          vector_store_ids: [vectorStoreId],
+        },
+      ],
+      // GPT-5.2 specific settings
+      reasoning: {
+        effort: 'low', // Use some reasoning for better blog quality
+      },
+      text: {
+        verbosity: 'medium', // Balanced output length
+      },
+      max_output_tokens: 4096,
     })
     const runDuration = ((Date.now() - runStartTime) / 1000).toFixed(1)
 
-    log('Step 6/8: Run completed', {
-      status: run.status,
+    log('Step 4/6: Response received', {
+      status: response.status,
       durationSeconds: runDuration,
-      runId: run.id,
-      usage: run.usage,
+      responseId: response.id,
+      usage: response.usage,
     })
 
-    if (run.status !== 'completed') {
-      log('Step 6/8: ❌ Run did NOT complete successfully', {
-        status: run.status,
-        lastError: run.last_error,
-        failedAt: run.failed_at,
-        incompleteDetails: run.incomplete_details,
+    if (response.status !== 'completed') {
+      log('Step 4/6: ❌ Response did NOT complete successfully', {
+        status: response.status,
+        error: response.error,
+        incompleteDetails: response.incomplete_details,
       })
-      throw new Error(`Run failed with status: ${run.status}. Last error: ${JSON.stringify(run.last_error)}`)
+      throw new Error(`Response failed with status: ${response.status}. Error: ${JSON.stringify(response.error)}`)
     }
 
-    // Get the generated content
-    log('Step 7/8: Fetching assistant response')
-    const messages = await openai.beta.threads.messages.list(thread.id)
-    log('Step 7/8: Messages fetched', {
-      totalMessages: messages.data.length,
-      messageRoles: messages.data.map((m) => m.role),
-    })
+    // Extract the generated content from the response
+    log('Step 5/6: Extracting generated content')
+    const markdownContent = response.output_text
 
-    const assistantMessage = messages.data.find((m) => m.role === 'assistant')
-
-    if (!assistantMessage) {
-      log('Step 7/8: ❌ No assistant message found in thread')
-      throw new Error('No assistant message found in thread')
+    if (!markdownContent) {
+      log('Step 5/6: ❌ No text content in response')
+      throw new Error('No text content in response output')
     }
 
-    log('Step 7/8: Assistant message found', {
-      contentBlocks: assistantMessage.content.length,
-      contentTypes: assistantMessage.content.map((c) => c.type),
-    })
-
-    if (assistantMessage.content[0].type !== 'text') {
-      log('Step 7/8: ❌ First content block is not text', {
-        actualType: assistantMessage.content[0].type,
-      })
-      throw new Error(`Expected text response, got: ${assistantMessage.content[0].type}`)
-    }
-
-    const markdownContent = assistantMessage.content[0].text.value
-    log('Step 7/8: ✓ Markdown content extracted', {
+    log('Step 5/6: ✓ Markdown content extracted', {
       contentLength: markdownContent.length,
       preview: markdownContent.slice(0, 200) + '...',
-      hasAnnotations: assistantMessage.content[0].text.annotations?.length || 0,
     })
 
     // Extract title from markdown (first line starting with #)
     const titleMatch = markdownContent.match(/^#\s+(.+)$/m)
     const blogTitle = titleMatch ? titleMatch[1].trim() : `Summary: ${paperTitle}`
-    log('Step 7/8: Title extracted', {
+    log('Step 5/6: Title extracted', {
       foundInMarkdown: !!titleMatch,
       extractedTitle: blogTitle,
     })
@@ -286,25 +253,25 @@ Remember to use the exact section structure and emoji headers specified in your 
     const baseSlug = generateSlug(blogTitle)
     const timestamp = Date.now()
     const slug = `${baseSlug}-${timestamp}`
-    log('Step 7/8: Slug generated', { baseSlug, timestamp, finalSlug: slug })
+    log('Step 5/6: Slug generated', { baseSlug, timestamp, finalSlug: slug })
 
     // Convert markdown to Lexical format
-    log('Step 7/8: Converting markdown to Lexical format')
+    log('Step 5/6: Converting markdown to Lexical format')
     const lexicalContent = markdownToLexical(markdownContent)
-    log('Step 7/8: ✓ Lexical conversion complete', {
+    log('Step 5/6: ✓ Lexical conversion complete', {
       rootChildrenCount: lexicalContent.root.children.length,
       nodeTypes: lexicalContent.root.children.map((c) => c.type),
     })
 
     // Get admin user for author (first admin user)
-    log('Step 8/8: Finding admin user for author')
+    log('Step 6/6: Finding admin user for author')
     const adminUsers = await payload.find({
       collection: 'users',
       where: { role: { equals: 'admin' } },
       limit: 1,
     })
     const authorId = adminUsers.docs[0]?.id
-    log('Step 8/8: Admin user search result', {
+    log('Step 6/6: Admin user search result', {
       found: !!authorId,
       authorId: authorId || 'NOT FOUND',
       totalAdminUsers: adminUsers.totalDocs,
@@ -315,7 +282,7 @@ Remember to use the exact section structure and emoji headers specified in your 
     }
 
     // Create the blog post
-    log('Step 8/8: Creating blog post in database')
+    log('Step 6/6: Creating blog post in database')
     const blogPostData = {
       title: blogTitle,
       slug,
@@ -326,7 +293,7 @@ Remember to use the exact section structure and emoji headers specified in your 
       sourcePaper: paperId,
       status: 'draft' as const,
     }
-    log('Step 8/8: Blog post data prepared', {
+    log('Step 6/6: Blog post data prepared', {
       title: blogPostData.title,
       slug: blogPostData.slug,
       excerptLength: blogPostData.excerpt.length,
@@ -339,10 +306,10 @@ Remember to use the exact section structure and emoji headers specified in your 
       collection: 'blog-posts',
       data: blogPostData,
     })
-    log('Step 8/8: ✓ Blog post created', { blogPostId: blogPost.id })
+    log('Step 6/6: ✓ Blog post created', { blogPostId: blogPost.id })
 
     // Update paper with the generated blog post reference
-    log('Step 8/8: Linking blog post to paper')
+    log('Step 6/6: Linking blog post to paper')
     await payload.update({
       collection: 'papers',
       id: paperId,
@@ -352,12 +319,7 @@ Remember to use the exact section structure and emoji headers specified in your 
       },
       context: { skipOpenAIUpload: true },
     })
-    log('Step 8/8: ✓ Paper updated with blog post reference')
-
-    // Clean up thread
-    log('Cleanup: Deleting OpenAI thread')
-    await openai.beta.threads.delete(thread.id)
-    log('Cleanup: ✓ Thread deleted')
+    log('Step 6/6: ✓ Paper updated with blog post reference')
 
     console.log('='.repeat(60))
     log('🎉 BLOG GENERATION COMPLETE!')
@@ -369,6 +331,8 @@ Remember to use the exact section structure and emoji headers specified in your 
       slug,
       contentLength: markdownContent.length,
       lexicalNodes: lexicalContent.root.children.length,
+      model: 'gpt-5.2',
+      api: 'Responses API',
     })
     console.log('='.repeat(60) + '\n')
 
@@ -395,72 +359,4 @@ Remember to use the exact section structure and emoji headers specified in your 
     }
     console.log('='.repeat(60) + '\n')
   }
-}
-
-/**
- * Get or create the blog generation assistant
- */
-let cachedAssistantId: string | null = null
-
-async function getOrCreateBlogAssistant(): Promise<string> {
-  log('getOrCreateBlogAssistant: Checking for cached assistant')
-
-  if (cachedAssistantId) {
-    log('getOrCreateBlogAssistant: Using cached assistant ID', { assistantId: cachedAssistantId })
-    return cachedAssistantId
-  }
-
-  const assistantName = 'Blog Post Generator'
-  log('getOrCreateBlogAssistant: No cache, searching for existing assistant', { assistantName })
-
-  // Check if assistant already exists
-  const assistants = await openai.beta.assistants.list({ limit: 100 })
-  log('getOrCreateBlogAssistant: Fetched assistants list', {
-    totalAssistants: assistants.data.length,
-    assistantNames: assistants.data.map((a) => a.name),
-  })
-
-  const existing = assistants.data.find((a) => a.name === assistantName)
-
-  if (existing) {
-    // Always update the assistant instructions to ensure they match the current prompt
-    log('getOrCreateBlogAssistant: Found existing assistant, updating instructions', {
-      assistantId: existing.id,
-    })
-    await openai.beta.assistants.update(existing.id, {
-      instructions: BLOG_SYSTEM_PROMPT,
-      model: 'gpt-5.2',
-      temperature: 0.7,
-    })
-    cachedAssistantId = existing.id
-    log('getOrCreateBlogAssistant: ✓ Assistant instructions updated', {
-      assistantId: existing.id,
-      model: existing.model,
-      tools: existing.tools.map((t) => t.type),
-    })
-    return existing.id
-  }
-
-  // Create new assistant
-  log('getOrCreateBlogAssistant: No existing assistant found, creating new one')
-  log('getOrCreateBlogAssistant: System prompt length', {
-    promptLength: BLOG_SYSTEM_PROMPT.length,
-    promptPreview: BLOG_SYSTEM_PROMPT.slice(0, 100) + '...',
-  })
-
-  const assistant = await openai.beta.assistants.create({
-    name: assistantName,
-    instructions: BLOG_SYSTEM_PROMPT,
-    model: 'gpt-5.2',
-    tools: [{ type: 'file_search' }],
-    temperature: 0.7, // Supported with reasoning effort 'none' (default for gpt-5.2)
-  })
-
-  cachedAssistantId = assistant.id
-  log('getOrCreateBlogAssistant: ✓ Created new assistant', {
-    assistantId: assistant.id,
-    model: assistant.model,
-    name: assistant.name,
-  })
-  return assistant.id
 }
