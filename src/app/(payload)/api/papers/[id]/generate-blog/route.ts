@@ -1,25 +1,18 @@
 import { getPayload } from 'payload'
 import configPromise from '@payload-config'
-import { Client } from '@upstash/qstash'
-
-// Initialize QStash client
-const qstash = new Client({
-  token: process.env.QSTASH_TOKEN!,
-})
-
-/**
- * Get the base URL for the worker endpoint
- * Uses PAYLOAD_PUBLIC_SERVER_URL in production, falls back to request origin
- */
-function getWorkerUrl(request: Request, paperId: string): string {
-  const baseUrl = process.env.PAYLOAD_PUBLIC_SERVER_URL || new URL(request.url).origin
-  return `${baseUrl}/api/papers/${paperId}/generate-blog/worker`
-}
 
 /**
  * POST /api/papers/[id]/generate-blog
- * Triggers blog generation via QStash
- * Returns immediately - QStash will call the worker endpoint
+ *
+ * Returns info about how to generate a blog post.
+ *
+ * For Vercel Hobby plan (10s timeout), use the STREAMING endpoint:
+ *   POST /api/papers/[id]/generate-blog/stream
+ *   - Returns Server-Sent Events with real-time progress
+ *   - Keeps connection alive past 10s limit via streaming
+ *   - Frontend must handle SSE stream
+ *
+ * This endpoint validates the paper and returns the streaming URL.
  */
 export async function POST(
   request: Request,
@@ -71,62 +64,21 @@ export async function POST(
       )
     }
 
-    // Update status to generating
-    await payload.update({
-      collection: 'papers',
-      id,
-      data: {
-        blogGenerationStatus: 'generating',
-        blogGenerationError: null,
-      },
-      context: { skipOpenAIUpload: true },
-    })
+    // Return info about streaming endpoint
+    const baseUrl = process.env.PAYLOAD_PUBLIC_SERVER_URL || new URL(request.url).origin
+    const streamUrl = `${baseUrl}/api/papers/${id}/generate-blog/stream`
 
-    // Queue the blog generation via QStash
-    const workerUrl = getWorkerUrl(request, id)
-    console.log(`[GENERATE-BLOG] Queuing blog generation via QStash: ${workerUrl}`)
-
-    const qstashResponse = await qstash.publishJSON({
-      url: workerUrl,
-      body: {
-        paperId: id,
-        paperTitle: paper.title,
-        vectorStoreId: paper.vectorStoreId,
-      },
-      // Retry configuration
-      retries: 3,
-    })
-
-    console.log(`[GENERATE-BLOG] QStash message queued: ${qstashResponse.messageId}`)
-
-    // Return immediately with "started" status
     return Response.json({
-      status: 'started',
-      message: 'Blog generation has been queued. Poll GET endpoint for status.',
+      status: 'ready',
+      message: 'Paper is ready for blog generation. Use the streaming endpoint.',
       paperId: id,
-      qstashMessageId: qstashResponse.messageId,
+      streamUrl,
+      instructions: 'POST to streamUrl and consume Server-Sent Events for real-time progress.',
     })
   } catch (error) {
-    console.error('[GENERATE-BLOG] Error queuing generation:', error)
-
-    // Try to reset paper status on error
-    try {
-      const payload = await getPayload({ config: configPromise })
-      await payload.update({
-        collection: 'papers',
-        id,
-        data: {
-          blogGenerationStatus: 'error',
-          blogGenerationError: error instanceof Error ? error.message : 'Failed to queue generation',
-        },
-        context: { skipOpenAIUpload: true },
-      })
-    } catch {
-      // Ignore update errors
-    }
-
+    console.error('[GENERATE-BLOG] Error:', error)
     return Response.json(
-      { error: error instanceof Error ? error.message : 'Failed to start blog generation' },
+      { error: error instanceof Error ? error.message : 'Failed to check paper status' },
       { status: 500 }
     )
   }

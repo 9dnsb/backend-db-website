@@ -21,7 +21,6 @@
     "@payloadcms/payload-cloud": "3.74.0",
     "@payloadcms/richtext-lexical": "^3.74.0",
     "@payloadcms/storage-vercel-blob": "^3.74.0",
-    "@upstash/qstash": "^2.9.0",
     "@vercel/functions": "^3.4.0",
     "an-array-of-english-words": "^2.0.0",
     "cross-env": "^10.1.0",
