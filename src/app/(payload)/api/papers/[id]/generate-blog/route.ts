@@ -4,15 +4,12 @@ import configPromise from '@payload-config'
 /**
  * POST /api/papers/[id]/generate-blog
  *
- * Returns info about how to generate a blog post.
+ * Triggers blog generation via external Render worker.
+ * Returns immediately - the worker runs asynchronously with no timeout limits.
  *
- * For Vercel Hobby plan (10s timeout), use the STREAMING endpoint:
- *   POST /api/papers/[id]/generate-blog/stream
- *   - Returns Server-Sent Events with real-time progress
- *   - Keeps connection alive past 10s limit via streaming
- *   - Frontend must handle SSE stream
- *
- * This endpoint validates the paper and returns the streaming URL.
+ * Required env vars:
+ *   - BLOG_WORKER_URL: URL of the Render worker (e.g., https://blog-worker.onrender.com)
+ *   - BLOG_WORKER_SECRET: Shared secret for authentication
  */
 export async function POST(
   request: Request,
@@ -64,21 +61,80 @@ export async function POST(
       )
     }
 
-    // Return info about streaming endpoint
-    const baseUrl = process.env.PAYLOAD_PUBLIC_SERVER_URL || new URL(request.url).origin
-    const streamUrl = `${baseUrl}/api/papers/${id}/generate-blog/stream`
+    // Check for worker configuration
+    const workerUrl = process.env.BLOG_WORKER_URL
+    const workerSecret = process.env.BLOG_WORKER_SECRET
 
+    if (!workerUrl || !workerSecret) {
+      console.error('[GENERATE-BLOG] Missing BLOG_WORKER_URL or BLOG_WORKER_SECRET')
+      return Response.json(
+        { error: 'Blog worker not configured' },
+        { status: 500 }
+      )
+    }
+
+    // Update status to generating
+    await payload.update({
+      collection: 'papers',
+      id,
+      data: {
+        blogGenerationStatus: 'generating',
+        blogGenerationError: null,
+      },
+      context: { skipOpenAIUpload: true },
+    })
+
+    // Call the Render worker (fire and forget - don't await)
+    // We use fetch without await so the request returns immediately
+    const workerEndpoint = `${workerUrl}/generate-blog`
+    console.log(`[GENERATE-BLOG] Calling worker: ${workerEndpoint}`)
+
+    fetch(workerEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${workerSecret}`,
+      },
+      body: JSON.stringify({
+        paperId: id,
+        paperTitle: paper.title,
+        vectorStoreId: paper.vectorStoreId,
+      }),
+    })
+      .then((res) => {
+        console.log(`[GENERATE-BLOG] Worker responded with status: ${res.status}`)
+      })
+      .catch((err) => {
+        console.error(`[GENERATE-BLOG] Worker call failed:`, err)
+      })
+
+    // Return immediately
     return Response.json({
-      status: 'ready',
-      message: 'Paper is ready for blog generation. Use the streaming endpoint.',
+      status: 'started',
+      message: 'Blog generation has been started. Poll GET endpoint for status.',
       paperId: id,
-      streamUrl,
-      instructions: 'POST to streamUrl and consume Server-Sent Events for real-time progress.',
     })
   } catch (error) {
     console.error('[GENERATE-BLOG] Error:', error)
+
+    // Try to reset paper status on error
+    try {
+      const payload = await getPayload({ config: configPromise })
+      await payload.update({
+        collection: 'papers',
+        id,
+        data: {
+          blogGenerationStatus: 'error',
+          blogGenerationError: error instanceof Error ? error.message : 'Failed to start generation',
+        },
+        context: { skipOpenAIUpload: true },
+      })
+    } catch {
+      // Ignore update errors
+    }
+
     return Response.json(
-      { error: error instanceof Error ? error.message : 'Failed to check paper status' },
+      { error: error instanceof Error ? error.message : 'Failed to start blog generation' },
       { status: 500 }
     )
   }
@@ -87,7 +143,7 @@ export async function POST(
 /**
  * GET /api/papers/[id]/generate-blog
  * Returns current blog generation status
- * Poll this endpoint to check if QStash worker has completed
+ * Poll this endpoint to check if worker has completed
  */
 export async function GET(
   request: Request,
