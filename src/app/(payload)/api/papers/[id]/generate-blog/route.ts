@@ -85,28 +85,41 @@ export async function POST(
     })
 
     // Call the Render worker (fire and forget - don't await)
-    // We use fetch without await so the request returns immediately
+    // Retry logic handles Render free tier cold starts (~60s wake time)
     const workerEndpoint = `${workerUrl}/generate-blog`
-    console.log(`[GENERATE-BLOG] Calling worker: ${workerEndpoint}`)
-
-    fetch(workerEndpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${workerSecret}`,
-      },
-      body: JSON.stringify({
-        paperId: id,
-        paperTitle: paper.title,
-        vectorStoreId: paper.vectorStoreId,
-      }),
+    const requestBody = JSON.stringify({
+      paperId: id,
+      paperTitle: paper.title,
+      vectorStoreId: paper.vectorStoreId,
     })
-      .then((res) => {
-        console.log(`[GENERATE-BLOG] Worker responded with status: ${res.status}`)
-      })
-      .catch((err) => {
-        console.error(`[GENERATE-BLOG] Worker call failed:`, err)
-      })
+
+    const callWorkerWithRetry = async (retries = 3, delay = 5000) => {
+      for (let i = 0; i < retries; i++) {
+        try {
+          console.log(`[GENERATE-BLOG] Calling worker (attempt ${i + 1}/${retries}): ${workerEndpoint}`)
+          const res = await fetch(workerEndpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${workerSecret}`,
+            },
+            body: requestBody,
+          })
+          console.log(`[GENERATE-BLOG] Worker responded with status: ${res.status}`)
+          return
+        } catch (err) {
+          console.error(`[GENERATE-BLOG] Worker call failed (attempt ${i + 1}):`, err)
+          if (i < retries - 1) {
+            console.log(`[GENERATE-BLOG] Retrying in ${delay / 1000}s...`)
+            await new Promise((resolve) => setTimeout(resolve, delay))
+          }
+        }
+      }
+      console.error(`[GENERATE-BLOG] All ${retries} attempts failed`)
+    }
+
+    // Fire and forget - don't await
+    callWorkerWithRetry()
 
     // Return immediately
     return Response.json({
