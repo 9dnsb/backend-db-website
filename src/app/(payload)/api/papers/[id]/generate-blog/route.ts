@@ -93,33 +93,20 @@ export async function POST(
       pdfUrl: paper.url,
     })
 
-    const callWorkerWithRetry = async (retries = 3, delay = 5000) => {
-      for (let i = 0; i < retries; i++) {
-        try {
-          console.log(`[GENERATE-BLOG] Calling worker (attempt ${i + 1}/${retries}): ${workerEndpoint}`)
-          const res = await fetch(workerEndpoint, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${workerSecret}`,
-            },
-            body: requestBody,
-          })
-          console.log(`[GENERATE-BLOG] Worker responded with status: ${res.status}`)
-          return
-        } catch (err) {
-          console.error(`[GENERATE-BLOG] Worker call failed (attempt ${i + 1}):`, err)
-          if (i < retries - 1) {
-            console.log(`[GENERATE-BLOG] Retrying in ${delay / 1000}s...`)
-            await new Promise((resolve) => setTimeout(resolve, delay))
-          }
-        }
-      }
-      console.error(`[GENERATE-BLOG] All ${retries} attempts failed`)
-    }
-
-    // Fire and forget - don't await
-    callWorkerWithRetry()
+    // Fire and forget - don't await the response
+    // The worker may take a while to respond (especially on cold start),
+    // but it will process the request and update MongoDB directly
+    console.log(`[GENERATE-BLOG] Calling worker: ${workerEndpoint}`)
+    fetch(workerEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${workerSecret}`,
+      },
+      body: requestBody,
+    }).catch((err) => {
+      console.error('[GENERATE-BLOG] Worker call failed (fire-and-forget):', err)
+    })
 
     // Return immediately
     return Response.json({
