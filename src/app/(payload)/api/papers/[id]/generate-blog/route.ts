@@ -38,9 +38,9 @@ export async function POST(
       )
     }
 
-    if (!paper.vectorStoreId) {
+    if (!paper.url) {
       return Response.json(
-        { error: 'Paper must have a vector store ID' },
+        { error: 'Paper must have a PDF file uploaded' },
         { status: 400 }
       )
     }
@@ -90,7 +90,7 @@ export async function POST(
     const requestBody = JSON.stringify({
       paperId: id,
       paperTitle: paper.title,
-      vectorStoreId: paper.vectorStoreId,
+      pdfUrl: paper.url,
     })
 
     const callWorkerWithRetry = async (retries = 3, delay = 5000) => {
