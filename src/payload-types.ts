@@ -239,6 +239,7 @@ export interface Paper {
   generatedBlogPost?: (string | null) | BlogPost;
   blogGenerationStatus?: ('pending' | 'generating' | 'completed' | 'error' | 'skipped') | null;
   blogGenerationError?: string | null;
+  blogGenerationProgress?: string | null;
   /**
    * OpenAI thread ID for blog generation
    */
@@ -417,6 +418,7 @@ export interface PapersSelect<T extends boolean = true> {
   generatedBlogPost?: T;
   blogGenerationStatus?: T;
   blogGenerationError?: T;
+  blogGenerationProgress?: T;
   blogThreadId?: T;
   blogRunId?: T;
   updatedAt?: T;
