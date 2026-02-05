@@ -115,6 +115,15 @@ export const Papers: CollectionConfig = {
         condition: (data) => data?.blogGenerationStatus === 'error',
       },
     },
+    {
+      name: 'blogGenerationProgress',
+      type: 'text',
+      admin: {
+        position: 'sidebar',
+        readOnly: true,
+        condition: (data) => data?.blogGenerationStatus === 'generating',
+      },
+    },
     // Fields for manual multi-step blog generation
     {
       name: 'blogThreadId',

@@ -117,10 +117,10 @@ export async function GET(
               return
             }
 
-            // Still generating - send heartbeat
+            // Still generating - send progress message from MongoDB
             sendEvent({
               status: 'generating',
-              message: 'Blog generation in progress...',
+              message: (currentPaper.blogGenerationProgress as string) || 'Blog generation in progress...',
             })
 
             // Schedule next poll
