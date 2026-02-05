@@ -60,6 +60,14 @@ export async function GET(
           return
         }
 
+        // Send initial progress immediately (don't wait for first poll)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const initialProgress = (paper as any).blogGenerationProgress as string | undefined
+        sendEvent({
+          status: 'generating',
+          message: initialProgress || 'Blog generation in progress...',
+        })
+
         // Poll for status changes
         const poll = async () => {
           // Check timeout

@@ -79,9 +79,14 @@ export default function BlogGenerationStatus({ path }: { path: string }) {
     }
 
     eventSource.onerror = () => {
-      // EventSource has built-in auto-reconnection
-      // This fires on each reconnection attempt
+      // EventSource auto-reconnects, but Vercel serverless may timeout
+      // Clear ref so we can reconnect manually if needed
       console.log('SSE connection error, will auto-reconnect...')
+
+      // If connection is closed (not just errored), clear ref to allow manual reconnect
+      if (eventSource.readyState === EventSource.CLOSED) {
+        eventSourceRef.current = null
+      }
     }
   }, [id])
 
