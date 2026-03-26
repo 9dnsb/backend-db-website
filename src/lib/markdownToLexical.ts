@@ -69,7 +69,7 @@ type ListNode = LexicalNode & {
   tag: 'ul' | 'ol'
 }
 
-type ListItemNode = LexicalNode & {
+type _ListItemNode = LexicalNode & {
   type: 'listitem'
   children: LexicalNode[]
   direction: 'ltr' | null
@@ -232,7 +232,6 @@ function parseInlineFormatting(text: string): LexicalNode[] {
     },
   ]
 
-  let remaining = text
   let lastIndex = 0
 
   // Find all matches and their positions

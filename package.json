@@ -15,36 +15,36 @@
     "start": "cross-env NODE_OPTIONS=--no-deprecation next start"
   },
   "dependencies": {
-    "@payloadcms/db-mongodb": "3.75.0",
-    "@payloadcms/email-nodemailer": "^3.75.0",
-    "@payloadcms/next": "3.75.0",
-    "@payloadcms/payload-cloud": "3.75.0",
-    "@payloadcms/richtext-lexical": "^3.75.0",
-    "@payloadcms/storage-vercel-blob": "^3.75.0",
-    "@vercel/functions": "^3.4.1",
+    "@payloadcms/db-mongodb": "3.80.0",
+    "@payloadcms/email-nodemailer": "^3.80.0",
+    "@payloadcms/next": "3.80.0",
+    "@payloadcms/payload-cloud": "3.80.0",
+    "@payloadcms/richtext-lexical": "^3.80.0",
+    "@payloadcms/storage-vercel-blob": "^3.80.0",
+    "@vercel/functions": "^3.4.3",
     "an-array-of-english-words": "^2.0.0",
     "cross-env": "^10.1.0",
-    "graphql": "^16.12.0",
-    "next": "16.1.6",
-    "openai": "^6.18.0",
-    "payload": "3.75.0",
+    "graphql": "^16.13.2",
+    "next": "16.2.1",
+    "openai": "^6.33.0",
+    "payload": "3.80.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "sharp": "0.34.5",
-    "slugify": "^1.6.6"
+    "slugify": "^1.6.8"
   },
   "devDependencies": {
-    "@types/node": "^25.2.1",
-    "@types/react": "19.2.13",
+    "@types/node": "^25.5.0",
+    "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
-    "eslint": "^9.39.2",
-    "eslint-config-next": "16.1.6",
+    "eslint": "^10.1.0",
+    "eslint-config-next": "16.2.1",
+    "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.8.1",
-    "typescript": "5.9.3"
+    "typescript": "6.0.2"
   },
   "engines": {
-    "node": "^18.20.2 || >=20.9.0",
-    "pnpm": "^9 || ^10"
+    "node": ">=20.19.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -52,7 +52,7 @@
     ]
   },
   "overrides": {
-    "@types/react": "19.2.13",
+    "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3"
   }
 }

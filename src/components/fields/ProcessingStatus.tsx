@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useRef, useReducer } from 'react'
 import { useField, useDocumentInfo } from '@payloadcms/ui'
 
 type Status = 'pending' | 'processing' | 'ready' | 'error'
@@ -15,28 +15,14 @@ const statusConfig: Record<Status, { label: string; color: string; bgColor: stri
 export default function ProcessingStatus({ path }: { path: string }) {
   const { value } = useField<Status>({ path })
   const { id } = useDocumentInfo()
-  const [currentStatus, setCurrentStatus] = useState<Status>(value || 'pending')
+  const [polledStatus, refreshPolledStatus] = useReducer(
+    (_: Status | null, newStatus: Status | null) => newStatus,
+    null
+  )
   const hasRefreshed = useRef(false)
 
-  const fetchStatus = useCallback(async () => {
-    if (!id) return null
-
-    try {
-      const response = await fetch(`/api/papers/${id}?depth=0`)
-      if (response.ok) {
-        const data = await response.json()
-        return data.processingStatus as Status
-      }
-    } catch (error) {
-      console.error('Failed to fetch status:', error)
-    }
-    return null
-  }, [id])
-
-  // Sync local state with field value
-  useEffect(() => {
-    setCurrentStatus(value || 'pending')
-  }, [value])
+  // Use polled status if available, otherwise use field value
+  const currentStatus = polledStatus ?? value ?? 'pending'
 
   // Poll while status is pending or processing
   useEffect(() => {
@@ -45,17 +31,22 @@ export default function ProcessingStatus({ path }: { path: string }) {
     const shouldPoll = currentStatus === 'pending' || currentStatus === 'processing'
     if (!shouldPoll) return
 
-    // Fetch immediately on mount, then every 3 seconds
     const poll = async () => {
-      const newStatus = await fetchStatus()
-      if (newStatus) {
-        setCurrentStatus(newStatus)
+      try {
+        const response = await fetch(`/api/papers/${id}?depth=0`)
+        if (response.ok) {
+          const data = await response.json()
+          const newStatus = data.processingStatus as Status
+          refreshPolledStatus(newStatus)
 
-        // If completed, refresh page once to show updated data
-        if ((newStatus === 'ready' || newStatus === 'error') && !hasRefreshed.current) {
-          hasRefreshed.current = true
-          window.location.reload()
+          // If completed, refresh page once to show updated data
+          if ((newStatus === 'ready' || newStatus === 'error') && !hasRefreshed.current) {
+            hasRefreshed.current = true
+            window.location.reload()
+          }
         }
+      } catch (error) {
+        console.error('Failed to fetch status:', error)
       }
     }
 
@@ -69,7 +60,7 @@ export default function ProcessingStatus({ path }: { path: string }) {
       clearTimeout(initialTimeout)
       clearInterval(interval)
     }
-  }, [id, currentStatus, fetchStatus])
+  }, [id, currentStatus])
 
   const config = statusConfig[currentStatus] || statusConfig.pending
   const showSpinner = currentStatus === 'pending' || currentStatus === 'processing'

@@ -45,12 +45,11 @@ export const uploadToOpenAI: CollectionAfterChangeHook = ({ doc, previousDoc, co
   })()
 
   // Keep serverless function alive if on Vercel
-  try {
-    const { waitUntil } = require('@vercel/functions')
-    waitUntil(processingPromise)
-  } catch {
-    // Not on Vercel, just let it run
-  }
+  import('@vercel/functions')
+    .then(({ waitUntil }) => waitUntil(processingPromise))
+    .catch(() => {
+      // Not on Vercel, just let it run
+    })
 
   log('Returning doc immediately', { docId: doc.id })
   return doc
